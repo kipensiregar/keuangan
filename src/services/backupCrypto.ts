@@ -99,11 +99,14 @@ export async function decryptBackup(content: string, password: string): Promise<
   }
   try {
     const key = await deriveKey(password, fromBase64(envelope.salt));
+    const iv = Uint8Array.from(fromBase64(envelope.iv)).buffer;
+    const ciphertext = Uint8Array.from(fromBase64(envelope.ciphertext)).buffer;
+
     const decrypted = await crypto.subtle.decrypt(
-      { name: 'AES-GCM', iv: fromBase64(envelope.iv) },
+      { name: 'AES-GCM', iv },
       key,
-      fromBase64(envelope.ciphertext)
-    );
+      ciphertext
+  );
     return new TextDecoder().decode(decrypted);
   } catch {
     throw new Error('Kata sandi salah atau file backup rusak. Database tidak diubah.');
