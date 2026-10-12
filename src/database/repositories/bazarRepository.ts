@@ -37,10 +37,76 @@ export const bazarRepository = {
   },
 
   async updateEvent(id: string, updates: Partial<BazarEvent>): Promise<void> {
-    await db.bazarEvents.update(id, {
-      ...updates,
-      updatedAt: new Date().toISOString()
+    const now = new Date().toISOString();
+    await db.transaction('rw', [db.bazarEvents, db.auditLogs], async () => {
+      const existing = await db.bazarEvents.get(id);
+      if (!existing) throw new Error('Event bazar tidak ditemukan.');
+
+      const safeUpdates: Partial<BazarEvent> = {
+        name: updates.name?.trim() ?? existing.name,
+        location: updates.location?.trim() ?? existing.location,
+        startDate: updates.startDate ?? existing.startDate,
+        endDate: updates.endDate ?? existing.endDate,
+        targetRevenue: updates.targetRevenue ?? existing.targetRevenue ?? 0,
+        notes: updates.notes?.trim() ?? existing.notes ?? '',
+        status: updates.status ?? existing.status,
+        updatedAt: now
+      };
+      if (!safeUpdates.name) throw new Error('Nama event wajib diisi.');
+      if (safeUpdates.endDate < safeUpdates.startDate) {
+        throw new Error('Tanggal berakhir tidak boleh lebih awal dari tanggal mulai.');
+      }
+
+      await db.bazarEvents.update(id, safeUpdates);
+      await db.auditLogs.add({
+        id: `audit_event_update_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        storeId: STORE_BAZAR_ID,
+        action: 'UPDATE',
+        entityType: 'BAZAR_EVENT',
+        entityId: id,
+        details: `Event bazar diperbarui: ${existing.name} -> ${safeUpdates.name}`,
+        timestamp: now
+      });
     });
+  },
+
+  /**
+   * Event hanya boleh dihapus bila belum dipakai transaksi, penjualan,
+   * pergerakan stok, atau piutang. Riwayat keuangan tidak pernah dihapus berantai.
+   */
+  async deleteEvent(id: string): Promise<void> {
+    const now = new Date().toISOString();
+    await db.transaction(
+      'rw',
+      [db.bazarEvents, db.dailySales, db.transactions, db.stockMovements, db.receivables, db.auditLogs],
+      async () => {
+        const event = await db.bazarEvents.get(id);
+        if (!event) throw new Error('Event bazar tidak ditemukan.');
+
+        const [sales, transactions, movements, receivables] = await Promise.all([
+          db.dailySales.where('eventId').equals(id).count(),
+          db.transactions.where('eventId').equals(id).count(),
+          db.stockMovements.where('eventId').equals(id).count(),
+          db.receivables.where('eventId').equals(id).count()
+        ]);
+        if (sales + transactions + movements + receivables > 0) {
+          throw new Error(
+            'Event tidak bisa dihapus karena sudah memiliki data penjualan, transaksi, pergerakan stok, atau piutang. Ubah status menjadi Selesai agar riwayat tetap aman.'
+          );
+        }
+
+        await db.bazarEvents.delete(id);
+        await db.auditLogs.add({
+          id: `audit_event_delete_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+          storeId: STORE_BAZAR_ID,
+          action: 'DELETE',
+          entityType: 'BAZAR_EVENT',
+          entityId: id,
+          details: `Event bazar dihapus: ${event.name} (${event.location})`,
+          timestamp: now
+        });
+      }
+    );
   },
 
   /**
