@@ -8,7 +8,7 @@ import { useApp } from '../../context/AppContext';
 import { bazarRepository } from '../../database/repositories/bazarRepository';
 import { type BazarEvent, STORE_BAZAR_ID } from '../../types';
 import { formatRupiah, formatIndonesianDate } from '../../utils/formatters';
-import { X, Tent, Plus, Calendar, MapPin, Target, TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
+import { X, Tent, Plus, Calendar, MapPin, Target, TrendingUp, TrendingDown, DollarSign, Pencil, Trash2, ArrowLeft } from 'lucide-react';
 
 interface BazarEventModalProps {
   isOpen: boolean;
@@ -23,7 +23,8 @@ export const BazarEventModal: React.FC<BazarEventModalProps> = ({
 }) => {
   const { bazarEvents, refreshData, showToast } = useApp();
 
-  const [activeTab, setActiveTab] = useState<'LIST' | 'CREATE'>('LIST');
+  const [activeTab, setActiveTab] = useState<'LIST' | 'CREATE' | 'EDIT'>('LIST');
+  const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [performanceData, setPerformanceData] = useState<any>(null);
   const [isLoadingPerf, setIsLoadingPerf] = useState(false);
@@ -35,6 +36,7 @@ export const BazarEventModal: React.FC<BazarEventModalProps> = ({
   const [endDate, setEndDate] = useState(new Date().toISOString().slice(0, 10));
   const [targetRevenueInput, setTargetRevenueInput] = useState('');
   const [notes, setNotes] = useState('');
+  const [eventStatus, setEventStatus] = useState<BazarEvent['status']>('ACTIVE');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -54,10 +56,38 @@ export const BazarEventModal: React.FC<BazarEventModalProps> = ({
 
   const targetRev = Math.max(0, parseInt(targetRevenueInput.replace(/\D/g, ''), 10) || 0);
 
+  const resetForm = () => {
+    setEditingEventId(null);
+    setName('');
+    setLocation('');
+    setStartDate(new Date().toISOString().slice(0, 10));
+    setEndDate(new Date().toISOString().slice(0, 10));
+    setTargetRevenueInput('');
+    setNotes('');
+    setEventStatus('ACTIVE');
+  };
+
+  const startEditEvent = (event: BazarEvent) => {
+    setEditingEventId(event.id);
+    setName(event.name);
+    setLocation(event.location || '');
+    setStartDate(event.startDate);
+    setEndDate(event.endDate);
+    setTargetRevenueInput(String(event.targetRevenue || 0));
+    setNotes(event.notes || '');
+    setEventStatus(event.status);
+    setSelectedEventId(null);
+    setActiveTab('EDIT');
+  };
+
   const handleCreateEvent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
       showToast('Nama event wajib diisi', 'error');
+      return;
+    }
+    if (endDate < startDate) {
+      showToast('Tanggal berakhir tidak boleh lebih awal dari tanggal mulai.', 'error');
       return;
     }
 
@@ -74,14 +104,62 @@ export const BazarEventModal: React.FC<BazarEventModalProps> = ({
         status: 'ACTIVE'
       });
       showToast('Event bazar baru berhasil dibuat!', 'success');
-      setName('');
-      setLocation('');
-      setTargetRevenueInput('');
-      setNotes('');
+      resetForm();
       setActiveTab('LIST');
       await refreshData();
     } catch (err: any) {
       showToast(err.message || 'Gagal membuat event bazar', 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleUpdateEvent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingEventId || !name.trim()) {
+      showToast('Nama event wajib diisi.', 'error');
+      return;
+    }
+    if (endDate < startDate) {
+      showToast('Tanggal berakhir tidak boleh lebih awal dari tanggal mulai.', 'error');
+      return;
+    }
+    try {
+      setIsSubmitting(true);
+      await bazarRepository.updateEvent(editingEventId, {
+        name: name.trim(),
+        location: location.trim() || 'Lokasi Stand Bazar',
+        startDate,
+        endDate,
+        targetRevenue: targetRev,
+        notes: notes.trim(),
+        status: eventStatus
+      });
+      showToast('Perubahan event berhasil disimpan.', 'success');
+      resetForm();
+      setActiveTab('LIST');
+      await refreshData();
+      if (selectedEventId === editingEventId) setSelectedEventId(null);
+    } catch (err: any) {
+      showToast(err.message || 'Gagal mengubah event bazar.', 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteEvent = async (event: BazarEvent) => {
+    const confirmed = window.confirm(
+      `Hapus event "${event.name}"? Event hanya bisa dihapus jika belum memiliki transaksi, penjualan, pergerakan stok, atau piutang. Tindakan ini tidak dapat dibatalkan.`
+    );
+    if (!confirmed) return;
+    try {
+      setIsSubmitting(true);
+      await bazarRepository.deleteEvent(event.id);
+      showToast('Event bazar berhasil dihapus.', 'success');
+      if (selectedEventId === event.id) setSelectedEventId(null);
+      await refreshData();
+    } catch (err: any) {
+      showToast(err.message || 'Gagal menghapus event bazar.', 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -115,6 +193,7 @@ export const BazarEventModal: React.FC<BazarEventModalProps> = ({
             onClick={() => {
               setActiveTab('LIST');
               setSelectedEventId(null);
+              resetForm();
             }}
             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
               activeTab === 'LIST'
@@ -126,6 +205,7 @@ export const BazarEventModal: React.FC<BazarEventModalProps> = ({
           </button>
           <button
             onClick={() => {
+              resetForm();
               setActiveTab('CREATE');
               setSelectedEventId(null);
             }}
@@ -154,9 +234,26 @@ export const BazarEventModal: React.FC<BazarEventModalProps> = ({
                     >
                       ← Kembali ke Daftar Event
                     </button>
-                    <span className="text-[11px] px-2 py-0.5 rounded-full font-bold bg-amber-100 text-amber-900 border border-amber-300">
-                      {performanceData.event.status}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => startEditEvent(performanceData.event)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50"
+                      >
+                        <Pencil className="w-3.5 h-3.5" /> Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteEvent(performanceData.event)}
+                        disabled={isSubmitting}
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-rose-200 text-xs font-bold text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" /> Hapus
+                      </button>
+                      <span className="text-[11px] px-2 py-0.5 rounded-full font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                        {performanceData.event.status}
+                      </span>
+                    </div>
                   </div>
 
                   <div className="p-4 bg-amber-50/80 rounded-2xl border border-amber-200/70">
@@ -306,14 +403,26 @@ export const BazarEventModal: React.FC<BazarEventModalProps> = ({
                             </span>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <span className="text-[10px] text-slate-400 block">Target:</span>
-                          <span className="text-xs font-bold text-slate-800">
-                            {formatRupiah(ev.targetRevenue || 0)}
-                          </span>
-                          <span className="text-[10px] text-[#800020] font-semibold block mt-1 hover:underline">
-                            Lihat Kinerja →
-                          </span>
+                        <div className="flex flex-col items-end gap-1.5 shrink-0 ml-3">
+                          <span className="text-[10px] text-slate-400">Target: <strong className="text-slate-800">{formatRupiah(ev.targetRevenue || 0)}</strong></span>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); startEditEvent(ev); }}
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-slate-200 text-[10px] font-bold text-slate-700 hover:bg-slate-50"
+                            >
+                              <Pencil className="w-3 h-3" /> Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); void handleDeleteEvent(ev); }}
+                              disabled={isSubmitting}
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-rose-200 text-[10px] font-bold text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+                            >
+                              <Trash2 className="w-3 h-3" /> Hapus
+                            </button>
+                          </div>
+                          <span className="text-[10px] text-[#800020] font-semibold hover:underline">Lihat Kinerja →</span>
                         </div>
                       </div>
                     ))
@@ -323,8 +432,16 @@ export const BazarEventModal: React.FC<BazarEventModalProps> = ({
             </>
           )}
 
-          {activeTab === 'CREATE' && (
-            <form onSubmit={handleCreateEvent} className="space-y-3.5">
+          {(activeTab === 'CREATE' || activeTab === 'EDIT') && (
+            <form onSubmit={activeTab === 'EDIT' ? handleUpdateEvent : handleCreateEvent} className="space-y-3.5">
+              {activeTab === 'EDIT' && (
+                <div className="flex items-center justify-between rounded-xl bg-amber-50 border border-amber-200 p-3">
+                  <div className="text-xs font-bold text-amber-900">Mengubah data event bazar</div>
+                  <button type="button" onClick={() => { resetForm(); setActiveTab('LIST'); }} className="inline-flex items-center gap-1 text-xs font-bold text-slate-600 hover:text-slate-900">
+                    <ArrowLeft className="w-3.5 h-3.5" /> Batal edit
+                  </button>
+                </div>
+              )}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">Nama Event Bazar *</label>
                 <input
@@ -371,6 +488,21 @@ export const BazarEventModal: React.FC<BazarEventModalProps> = ({
                 </div>
               </div>
 
+              {activeTab === 'EDIT' && (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Status Event</label>
+                  <select
+                    value={eventStatus}
+                    onChange={(e) => setEventStatus(e.target.value as BazarEvent['status'])}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold"
+                  >
+                    <option value="UPCOMING">Akan Datang</option>
+                    <option value="ACTIVE">Aktif</option>
+                    <option value="COMPLETED">Selesai</option>
+                  </select>
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">Target Omzet (Rp)</label>
                 <input
@@ -399,7 +531,7 @@ export const BazarEventModal: React.FC<BazarEventModalProps> = ({
                 disabled={isSubmitting || !name.trim()}
                 className="w-full py-3 bg-[#800020] hover:bg-[#580016] text-amber-200 font-bold rounded-2xl text-xs transition-colors shadow-md disabled:opacity-50 cursor-pointer"
               >
-                {isSubmitting ? 'Menyimpan...' : 'Simpan Event Bazar'}
+                {isSubmitting ? 'Menyimpan...' : activeTab === 'EDIT' ? 'Simpan Perubahan Event' : 'Simpan Event Bazar'}
               </button>
             </form>
           )}
