@@ -1,3 +1,4 @@
+
 /** Password-encrypted backup envelope for Warung Medan Finance. */
 const BACKUP_MAGIC = 'WMF-ENCRYPTED-BACKUP';
 const BACKUP_VERSION = 1;
@@ -14,6 +15,13 @@ type EncryptedBackupEnvelope = {
   ciphertext: string;
 };
 
+/** Copy bytes into a standalone ArrayBuffer for Web Crypto. */
+function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  return copy.buffer;
+}
+
 function toBase64(bytes: Uint8Array): string {
   let binary = '';
   for (let i = 0; i < bytes.length; i += 0x8000) {
@@ -25,40 +33,62 @@ function toBase64(bytes: Uint8Array): string {
 function fromBase64(value: string): Uint8Array {
   const binary = atob(value);
   const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
   return bytes;
 }
 
-async function deriveKey(password: string, salt: Uint8Array): Promise<CryptoKey> {
+async function deriveKey(
+  password: string,
+  salt: Uint8Array
+): Promise<CryptoKey> {
   if (!password || password.length < 12) {
     throw new Error('Kata sandi backup minimal 12 karakter.');
   }
+
   const material = await crypto.subtle.importKey(
-    'raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveKey']
+    'raw',
+    toArrayBuffer(new TextEncoder().encode(password)),
+    'PBKDF2',
+    false,
+    ['deriveKey']
   );
+
   return crypto.subtle.deriveKey(
     {
-    name: 'PBKDF2',
-    salt: Uint8Array.from(salt).buffer,
-    iterations: PBKDF2_ITERATIONS,
-    hash: 'SHA-256'
+      name: 'PBKDF2',
+      salt: toArrayBuffer(salt),
+      iterations: PBKDF2_ITERATIONS,
+      hash: 'SHA-256'
     },
+    material,
     { name: 'AES-GCM', length: 256 },
     false,
     ['encrypt', 'decrypt']
   );
 }
 
-export async function encryptBackup(plaintext: string, password: string): Promise<string> {
+export async function encryptBackup(
+  plaintext: string,
+  password: string
+): Promise<string> {
   if (!globalThis.crypto?.subtle) {
-    throw new Error('Enkripsi membutuhkan browser modern dan konteks aman HTTPS atau localhost.');
+    throw new Error(
+      'Enkripsi membutuhkan browser modern dan konteks aman HTTPS atau localhost.'
+    );
   }
+
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const key = await deriveKey(password, salt);
+
   const encrypted = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv }, key, new TextEncoder().encode(plaintext)
+    { name: 'AES-GCM', iv: toArrayBuffer(iv) },
+    key,
+    toArrayBuffer(new TextEncoder().encode(plaintext))
   );
+
   const envelope: EncryptedBackupEnvelope = {
     magic: BACKUP_MAGIC,
     version: BACKUP_VERSION,
@@ -69,6 +99,7 @@ export async function encryptBackup(plaintext: string, password: string): Promis
     iv: toBase64(iv),
     ciphertext: toBase64(new Uint8Array(encrypted))
   };
+
   return JSON.stringify(envelope, null, 2);
 }
 
@@ -80,35 +111,58 @@ export function isEncryptedBackup(content: string): boolean {
   }
 }
 
-export async function decryptBackup(content: string, password: string): Promise<string> {
+export async function decryptBackup(
+  content: string,
+  password: string
+): Promise<string> {
   if (!globalThis.crypto?.subtle) {
-    throw new Error('Dekripsi membutuhkan browser modern dan konteks aman HTTPS atau localhost.');
+    throw new Error(
+      'Dekripsi membutuhkan browser modern dan konteks aman HTTPS atau localhost.'
+    );
   }
+
   let envelope: EncryptedBackupEnvelope;
+
   try {
     envelope = JSON.parse(content) as EncryptedBackupEnvelope;
   } catch {
     throw new Error('Format backup terenkripsi tidak valid.');
   }
-  if (envelope.magic !== BACKUP_MAGIC || envelope.version !== BACKUP_VERSION ||
-      envelope.kdf !== 'PBKDF2-SHA-256' || envelope.cipher !== 'AES-GCM-256') {
+
+  if (
+    envelope.magic !== BACKUP_MAGIC ||
+    envelope.version !== BACKUP_VERSION ||
+    envelope.kdf !== 'PBKDF2-SHA-256' ||
+    envelope.cipher !== 'AES-GCM-256'
+  ) {
     throw new Error('Format atau versi backup terenkripsi tidak didukung.');
   }
+
   if (envelope.iterations !== PBKDF2_ITERATIONS) {
     throw new Error('Parameter keamanan backup tidak valid.');
   }
+
   try {
-    const key = await deriveKey(password, fromBase64(envelope.salt));
-    const iv = Uint8Array.from(fromBase64(envelope.iv)).buffer;
-    const ciphertext = Uint8Array.from(fromBase64(envelope.ciphertext)).buffer;
+    const salt = fromBase64(envelope.salt);
+    const iv = fromBase64(envelope.iv);
+    const ciphertext = fromBase64(envelope.ciphertext);
+
+    if (salt.length !== 16 || iv.length !== 12 || ciphertext.length < 16) {
+      throw new Error('Data backup tidak valid.');
+    }
+
+    const key = await deriveKey(password, salt);
 
     const decrypted = await crypto.subtle.decrypt(
-      { name: 'AES-GCM', iv },
+      { name: 'AES-GCM', iv: toArrayBuffer(iv) },
       key,
-      ciphertext
-  );
+      toArrayBuffer(ciphertext)
+    );
+
     return new TextDecoder().decode(decrypted);
   } catch {
-    throw new Error('Kata sandi salah atau file backup rusak. Database tidak diubah.');
+    throw new Error(
+      'Kata sandi salah atau file backup rusak. Database tidak diubah.'
+    );
   }
 }
