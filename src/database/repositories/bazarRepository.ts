@@ -53,7 +53,11 @@ export const bazarRepository = {
         updatedAt: now
       };
       if (!safeUpdates.name) throw new Error('Nama event wajib diisi.');
-      if (safeUpdates.endDate < safeUpdates.startDate) {
+      // Resolve dates from the existing event as Partial<BazarEvent> makes
+      // safeUpdates.startDate/endDate optional to TypeScript.
+      const resolvedStartDate = safeUpdates.startDate ?? existing.startDate;
+      const resolvedEndDate = safeUpdates.endDate ?? existing.endDate;
+      if (resolvedEndDate < resolvedStartDate) {
         throw new Error('Tanggal berakhir tidak boleh lebih awal dari tanggal mulai.');
       }
 
