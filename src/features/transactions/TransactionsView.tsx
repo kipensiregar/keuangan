@@ -31,6 +31,7 @@ export const TransactionsView: React.FC = () => {
 
   const [activeSubTab, setActiveSubTab] = useState<'ALL' | 'SALES' | 'EXPENSES' | 'TRANSFERS'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
+  const [bazarAreaFilter, setBazarAreaFilter] = useState<'ALL' | 'A' | 'B'>('ALL');
   const [salesList, setSalesList] = useState<DailySalesSummary[]>([]);
   const [txList, setTxList] = useState<FinancialTransaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -143,7 +144,9 @@ export const TransactionsView: React.FC = () => {
   };
 
   // Filtered lists
+  const shouldFilterBazarArea = selectedStoreId === 'store_bazar' || selectedStoreId === 'ALL';
   const filteredSales = salesList.filter((s) => {
+    if (shouldFilterBazarArea && bazarAreaFilter !== 'ALL' && s.bazarArea !== bazarAreaFilter) return false;
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
     return (
@@ -154,6 +157,7 @@ export const TransactionsView: React.FC = () => {
   });
 
   const filteredTxs = txList.filter((t) => {
+    if (shouldFilterBazarArea && bazarAreaFilter !== 'ALL' && t.bazarArea !== bazarAreaFilter) return false;
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
     return (
@@ -198,6 +202,15 @@ export const TransactionsView: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {(selectedStoreId === 'store_bazar' || selectedStoreId === 'ALL') && (
+        <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3">
+          <label className="text-xs font-bold text-amber-950 whitespace-nowrap">Filter area transaksi:</label>
+          <select value={bazarAreaFilter} onChange={(e) => setBazarAreaFilter(e.target.value as 'ALL' | 'A' | 'B')} className="flex-1 h-10 rounded-lg border border-amber-300 bg-white px-3 text-xs font-semibold">
+            <option value="ALL">Semua Area Bazar</option><option value="A">Bazar A</option><option value="B">Bazar B</option>
+          </select>
+        </div>
+      )}
 
       {/* Sub Tabs */}
       <div className="flex items-center gap-1 p-1 bg-slate-200/70 rounded-xl overflow-x-auto">
@@ -302,6 +315,7 @@ export const TransactionsView: React.FC = () => {
                       <span>{formatIndonesianDate(s.date, true)}</span>
                       <span>·</span>
                       <span>{s.paymentMethod}</span>
+                      {s.bazarArea && <span>· Bazar {s.bazarArea}</span>}
                       {s.referenceNumber && <span>· No: {s.referenceNumber}</span>}
                     </div>
                     {s.notes && (
@@ -374,6 +388,7 @@ export const TransactionsView: React.FC = () => {
                           <span>{formatIndonesianDate(t.date, true)}</span>
                           <span>·</span>
                           <span>{t.category}</span>
+                          {t.bazarArea && <span>· Bazar {t.bazarArea}</span>}
                           <span>·</span>
                           <span>{t.paymentMethod}</span>
                         </div>

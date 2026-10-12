@@ -6,7 +6,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { salesRepository } from '../../database/repositories/salesRepository';
-import { type SalesChannel, type PaymentMethod, type PaymentSplitItem, DEFAULT_OFFICIAL_STORES } from '../../types';
+import { type BazarArea, type SalesChannel, type PaymentMethod, type PaymentSplitItem, DEFAULT_OFFICIAL_STORES } from '../../types';
 import { formatRupiah } from '../../utils/formatters';
 import { X, CheckCircle, Calculator } from 'lucide-react';
 
@@ -24,6 +24,7 @@ export const AddSalesModal: React.FC<AddSalesModalProps> = ({ isOpen, onClose, o
   const initialStore = selectedStoreId !== 'ALL' ? selectedStoreId : 'store_palembang_center';
   const [storeId, setStoreId] = useState(initialStore);
   const [eventId, setEventId] = useState<string>('');
+  const [bazarArea, setBazarArea] = useState<BazarArea | ''>('');
   const [channel, setChannel] = useState<SalesChannel>('Dine-in');
   const [grossSalesInput, setGrossSalesInput] = useState('');
   const [discountInput, setDiscountInput] = useState('');
@@ -122,6 +123,7 @@ export const AddSalesModal: React.FC<AddSalesModalProps> = ({ isOpen, onClose, o
       await salesRepository.createDailySummary({
         storeId,
         eventId: (storeId === 'store_bazar' || channel === 'Bazar') && eventId ? eventId : undefined,
+        bazarArea: (storeId === 'store_bazar' || channel === 'Bazar') && bazarArea ? bazarArea : undefined,
         date,
         channel,
         grossSales,
@@ -168,7 +170,7 @@ export const AddSalesModal: React.FC<AddSalesModalProps> = ({ isOpen, onClose, o
         <form onSubmit={handleSubmit} className="space-y-4 pt-4">
           {/* Unit Cabang */}
           <div className="p-3 bg-amber-50/70 rounded-2xl border border-amber-200/60 space-y-2">
-            <div className="grid grid-cols-2 gap-2.5">
+            <div className={`grid ${(storeId === 'store_bazar' || channel === 'Bazar') ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-2'} gap-2.5`}>
               <div>
                 <label className="block text-xs font-semibold text-slate-800 mb-1">
                   Unit Cabang Usaha *
@@ -186,6 +188,14 @@ export const AddSalesModal: React.FC<AddSalesModalProps> = ({ isOpen, onClose, o
                 </select>
               </div>
 
+              {(storeId === 'store_bazar' || channel === 'Bazar') && (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-800 mb-1">Area Bazar</label>
+                  <select value={bazarArea} onChange={(e) => setBazarArea(e.target.value as BazarArea | '')} className="w-full h-10 px-3 rounded-xl border border-slate-300 text-xs bg-white">
+                    <option value="">Umum / belum dipilih</option><option value="A">Bazar A</option><option value="B">Bazar B</option>
+                  </select>
+                </div>
+              )}
               {(storeId === 'store_bazar' || channel === 'Bazar') ? (
                 <div>
                   <label className="block text-xs font-semibold text-slate-800 mb-1">

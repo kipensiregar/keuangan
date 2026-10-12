@@ -193,12 +193,7 @@ export const DashboardView: React.FC = () => {
               Aplikasi menggunakan data contoh simulasi usaha.
             </span>
           </div>
-          <button
-            onClick={() => setActiveTab('settings')}
-            className="text-[11px] font-bold text-[#800020] hover:underline whitespace-nowrap ml-2"
-          >
-            Mulai Pembukuan Nyata →
-          </button>
+
         </div>
       )}
 

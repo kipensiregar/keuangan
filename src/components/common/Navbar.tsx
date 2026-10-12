@@ -69,13 +69,12 @@ export const Navbar: React.FC = () => {
         <div className="flex items-center gap-2">
           {/* Demo Mode Badge */}
           {settings?.isDemoMode && (
-            <button
-              onClick={() => setActiveTab('settings')}
-              className="min-h-[38px] px-2 rounded-lg bg-amber-400 text-slate-900 text-[11px] font-bold flex items-center gap-1 shadow-xs hover:bg-amber-300"
-              title="Aplikasi sedang dalam Mode Simulasi / Demo Data. Klik untuk mulai pembukuan nyata."
+            <span
+              className="min-h-[38px] px-2 rounded-lg bg-amber-400 text-slate-900 text-[11px] font-bold inline-flex items-center gap-1 shadow-xs"
+              title="Mode data demo aktif"
             >
-              <span>DATA DEMO</span>
-            </button>
+              DATA DEMO
+            </span>
           )}
 
           {/* Low Stock Indicator if any */}

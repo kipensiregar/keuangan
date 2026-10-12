@@ -3,10 +3,10 @@
  * Warung Medan CT Catering
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { inventoryRepository } from '../../database/repositories/inventoryRepository';
-import type { StockMovementType, Ingredient } from '../../types';
+import type { BazarArea, StockMovementType, Ingredient } from '../../types';
 import { formatRupiah } from '../../utils/formatters';
 import { X, CheckCircle, PackagePlus, Flame, AlertTriangle, Scale } from 'lucide-react';
 
@@ -15,36 +15,63 @@ interface StockMovementModalProps {
   onClose: () => void;
   onSuccess: () => void;
   selectedIngredient?: Ingredient | null;
+  defaultBazarArea?: BazarArea;
 }
 
 export const StockMovementModal: React.FC<StockMovementModalProps> = ({
   isOpen,
   onClose,
   onSuccess,
-  selectedIngredient
+  selectedIngredient,
+  defaultBazarArea
 }) => {
-  const { ingredients, showToast } = useApp();
+  const { ingredients, bazarEvents, selectedStoreId, showToast } = useApp();
+  const visibleIngredients = ingredients.filter((item) => selectedStoreId === 'ALL' || item.storeId === selectedStoreId);
+  const areaScope = bazarArea || defaultBazarArea;
+  const movementIngredients = areaScope
+    ? visibleIngredients.filter((item) => item.storeId === 'store_bazar' && (!item.bazarArea || item.bazarArea === areaScope))
+    : visibleIngredients;
 
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [ingredientId, setIngredientId] = useState(selectedIngredient?.id || ingredients[0]?.id || '');
   const [movementType, setMovementType] = useState<StockMovementType>('PEMAKAIAN_MANUAL');
   const [qtyInput, setQtyInput] = useState('');
   const [purchasePriceInput, setPurchasePriceInput] = useState('');
+  const [secondaryQtyInput, setSecondaryQtyInput] = useState('');
+  const [bazarArea, setBazarArea] = useState<BazarArea | ''>(defaultBazarArea || '');
+  const [eventId, setEventId] = useState('');
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const visibleIngredients = ingredients.filter((item) => selectedStoreId === 'ALL' || item.storeId === selectedStoreId);
+  const areaScope = bazarArea || defaultBazarArea;
+  const movementIngredients = areaScope
+    ? visibleIngredients.filter((item) => item.storeId === 'store_bazar' && (!item.bazarArea || item.bazarArea === areaScope))
+    : visibleIngredients;
+
+  useEffect(() => {
+    if (isOpen) {
+      setBazarArea(defaultBazarArea || selectedIngredient?.bazarArea || '');
+      setEventId('');
+      setQtyInput('');
+      setSecondaryQtyInput('');
+      setPurchasePriceInput('');
+      setNotes('');
+    }
+  }, [isOpen, defaultBazarArea, selectedIngredient?.id]);
 
   React.useEffect(() => {
-    if (selectedIngredient?.id) {
+    if (selectedIngredient?.id && movementIngredients.some((item) => item.id === selectedIngredient.id)) {
       setIngredientId(selectedIngredient.id);
-    } else if (ingredients.length > 0 && !ingredientId) {
-      setIngredientId(ingredients[0].id);
+    } else if (movementIngredients.length > 0 && !movementIngredients.some((item) => item.id === ingredientId)) {
+      setIngredientId(movementIngredients[0].id);
     }
-  }, [selectedIngredient, ingredients]);
+  }, [selectedIngredient?.id, selectedStoreId, ingredients, ingredientId, bazarArea, defaultBazarArea]);
 
   if (!isOpen) return null;
 
-  const currentIng = ingredients.find((i) => i.id === ingredientId) || ingredients[0];
+  const currentIng = movementIngredients.find((i) => i.id === ingredientId) || (selectedIngredient ? movementIngredients.find((i) => i.id === selectedIngredient.id) : undefined) || movementIngredients[0];
   const quantity = Math.max(0, parseFloat(qtyInput) || 0);
+  const secondaryQuantity = Math.max(0, parseFloat(secondaryQtyInput) || 0);
   const purchasePrice = Math.max(0, parseInt(purchasePriceInput.replace(/\D/g, ''), 10) || 0);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -53,8 +80,12 @@ export const StockMovementModal: React.FC<StockMovementModalProps> = ({
       showToast('Pilih bahan baku terlebih dahulu', 'error');
       return;
     }
-    if (quantity <= 0) {
-      showToast('Jumlah bahan harus lebih dari 0', 'error');
+    if (quantity <= 0 && secondaryQuantity <= 0) {
+      showToast('Isi jumlah satuan utama atau satuan tambahan lebih dari 0', 'error');
+      return;
+    }
+    if (currentIng.secondaryUnit && secondaryQtyInput.trim() === '') {
+      showToast(`Jumlah dalam ${currentIng.secondaryUnit} wajib diisi agar stok ganda tetap akurat. Isi 0 jika tidak ada perubahan.`, 'error');
       return;
     }
 
@@ -64,7 +95,10 @@ export const StockMovementModal: React.FC<StockMovementModalProps> = ({
         ingredientId: currentIng.id,
         date,
         type: movementType,
-        quantity,
+        quantity: movementType === 'PENYESUAIAN_OPNAME' && qtyInput.trim() === '' ? currentIng.currentStock : quantity,
+        secondaryQuantity: currentIng.secondaryUnit ? secondaryQuantity : undefined,
+        bazarArea: currentIng.storeId === 'store_bazar' ? (bazarArea || currentIng.bazarArea) || undefined : undefined,
+        eventId: currentIng.storeId === 'store_bazar' && eventId ? eventId : undefined,
         unitPrice: movementType === 'MASUK_PEMBELIAN' && purchasePrice > 0 ? purchasePrice : undefined,
         notes: notes.trim() || undefined
       });
@@ -102,6 +136,23 @@ export const StockMovementModal: React.FC<StockMovementModalProps> = ({
 
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="space-y-4 pt-4">
+          {(selectedStoreId === 'store_bazar' || currentIng?.storeId === 'store_bazar') && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Area Bazar</label>
+                <select value={bazarArea} onChange={(e) => setBazarArea(e.target.value as BazarArea | '')} className="w-full h-10 px-3 rounded-xl border border-slate-300 bg-white text-xs">
+                  <option value="">Ikuti master / umum</option><option value="A">Bazar A</option><option value="B">Bazar B</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Event (opsional)</label>
+                <select value={eventId} onChange={(e) => setEventId(e.target.value)} className="w-full h-10 px-3 rounded-xl border border-slate-300 bg-white text-xs">
+                  <option value="">Umum / tanpa event</option>{bazarEvents.map((event) => <option key={event.id} value={event.id}>{event.name}</option>)}
+                </select>
+              </div>
+            </div>
+          )}
+
           {/* Pilih Bahan Baku */}
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1">
@@ -112,9 +163,9 @@ export const StockMovementModal: React.FC<StockMovementModalProps> = ({
               onChange={(e) => setIngredientId(e.target.value)}
               className="w-full h-11 px-3 rounded-xl border border-slate-300 text-sm font-semibold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-[#800020]"
             >
-              {ingredients.map((ing) => (
+              {movementIngredients.map((ing) => (
                 <option key={ing.id} value={ing.id}>
-                  {ing.name} (Sisa: {ing.currentStock} {ing.unit})
+                  {ing.name} (Sisa: {ing.currentStock} {ing.unit}{ing.secondaryUnit ? ` · ${ing.currentSecondaryStock ?? 0} ${ing.secondaryUnit}` : ''})
                 </option>
               ))}
             </select>
@@ -126,7 +177,7 @@ export const StockMovementModal: React.FC<StockMovementModalProps> = ({
               <div>
                 <span className="text-slate-500">Stok Saat Ini:</span>
                 <div className="font-bold font-mono tabular-nums text-slate-800 text-sm mt-0.5">
-                  {currentIng.currentStock} {currentIng.unit}
+                  {currentIng.currentStock} {currentIng.unit}{currentIng.secondaryUnit ? ` · ${currentIng.currentSecondaryStock ?? 0} ${currentIng.secondaryUnit}` : ''}
                 </div>
               </div>
               <div>
@@ -238,6 +289,16 @@ export const StockMovementModal: React.FC<StockMovementModalProps> = ({
             </div>
           </div>
 
+          {currentIng?.secondaryUnit && (
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                {movementType === 'PENYESUAIAN_OPNAME' ? `Stok Fisik Baru (${currentIng.secondaryUnit})` : `Jumlah Tambahan (${currentIng.secondaryUnit})`}
+              </label>
+              <input type="number" step="any" min="0" value={secondaryQtyInput} onChange={(e) => setSecondaryQtyInput(e.target.value)} placeholder={`Contoh: 48 ${currentIng.secondaryUnit}`} className="w-full h-11 px-3 rounded-xl border border-slate-300 text-sm font-mono" />
+              <p className="text-[11px] text-slate-500 mt-1">Satuan tambahan dicatat terpisah, misalnya berat dalam kg dan jumlah potong.</p>
+            </div>
+          )}
+
           {/* Harga Beli jika Masuk Pembelian */}
           {movementType === 'MASUK_PEMBELIAN' && (
             <div>
@@ -284,7 +345,7 @@ export const StockMovementModal: React.FC<StockMovementModalProps> = ({
             </button>
             <button
               type="submit"
-              disabled={isSubmitting || quantity <= 0}
+              disabled={isSubmitting || (quantity <= 0 && secondaryQuantity <= 0)}
               className="px-5 py-2.5 rounded-xl bg-[#800020] text-xs font-bold text-white hover:bg-[#660019] shadow-sm disabled:opacity-50 min-h-[44px] flex items-center gap-1.5"
             >
               <CheckCircle className="w-4 h-4" />

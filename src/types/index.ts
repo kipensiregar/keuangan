@@ -109,6 +109,8 @@ export type TransactionType =
   | 'TRANSFER_ANTAR_AKUN'
   | 'TRANSFER_ANTAR_CABANG';
 
+export type BazarArea = 'A' | 'B';
+
 export type UnitType =
   | 'kg'
   | 'gram'
@@ -153,6 +155,7 @@ export interface DailySalesSummary {
   id: string;
   storeId: string; // Foreign key ke stores
   eventId?: string; // Foreign key opsional ke bazar_events jika unit Bazar
+  bazarArea?: BazarArea;
   date: string; // YYYY-MM-DD
   channel: SalesChannel;
   grossSales: number;
@@ -172,6 +175,7 @@ export interface FinancialTransaction {
   id: string;
   storeId: string; // Foreign key ke stores
   eventId?: string; // Foreign key opsional ke bazar_events
+  bazarArea?: BazarArea;
   date: string; // YYYY-MM-DD
   type: TransactionType;
   category: ExpenseCategory | 'Transfer Antar-Akun' | 'Transfer Antar-Cabang' | 'Ekuitas Pemilik' | 'Utang/Piutang';
@@ -197,11 +201,15 @@ export interface FinancialTransaction {
 export interface Ingredient {
   id: string;
   storeId: string; // Persediaan bahan baku tersimpan di unit cabang mana
+  bazarArea?: BazarArea; // Pemisahan persediaan area Bazar A/B
   name: string;
   category: string; // e.g. Bumbu Khas Batak, Daging & Unggas, Ikan Air Tawar, Sayuran, Bahan Pokok
   unit: UnitType;
   initialStock: number;
   currentStock: number;
+  secondaryUnit?: UnitType;
+  initialSecondaryStock?: number;
+  currentSecondaryStock?: number;
   minimumStock: number;
   averagePurchasePrice: number; // Weighted average cost per unit
   totalValuation: number; // currentStock * averagePurchasePrice
@@ -215,11 +223,13 @@ export interface StockMovement {
   id: string;
   storeId: string; // Unit cabang pencatat mutasi
   eventId?: string; // Terkait event bazar bila ada
+  bazarArea?: BazarArea;
   ingredientId: string;
   ingredientName: string;
   date: string; // YYYY-MM-DD
   type: StockMovementType;
-  quantity: number; // positive number
+  quantity: number; // positive number in primary unit
+  secondaryQuantity?: number; // optional parallel count, e.g. pieces alongside kg
   unit: UnitType;
   unitPrice?: number; // for purchase or transfer valuation
   totalAmount?: number;

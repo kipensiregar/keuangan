@@ -76,3 +76,13 @@ Sebelum beralih, ekspor backup dari versi lama. Jika ada data yang hanya berada 
 - PIN aplikasi membantu membatasi penggunaan UI, tetapi bukan pengganti keamanan akun OS atau enkripsi seluruh disk.
 - Backup terenkripsi memakai Web Crypto AES-GCM dan PBKDF2. Gunakan HTTPS (GitHub Pages) atau localhost.
 - Sebelum pembukuan produksi, uji transaksi, konsolidasi, backup, dan restore dengan data contoh serta buat backup awal.
+
+
+## Pengembangan fitur inventaris (Oktober 2026)
+
+- Master bahan baku dapat diedit untuk memperbarui nama, kategori, harga satuan, batas minimum, supplier, dan area Bazar. Penghapusan menggunakan arsip (soft delete) agar riwayat tidak hilang; stok harus nol terlebih dahulu.
+- Bahan baku dapat memakai satu satuan utama (contoh kg) dan satu satuan tambahan (contoh potong). Stok awal dan setiap pergerakan menyimpan kedua kuantitas secara terpisah; nilai persediaan/HPP tetap dihitung dari satuan utama.
+- Bazar A dan B tersedia sebagai pilihan area pada master bahan, pergerakan stok, input penjualan/pengeluaran, dan filter daftar stok/transaksi.
+- Tombol ajakan “Mulai Pembukuan Nyata” dihapus; indikator DATA DEMO tetap informatif dan tidak lagi menjadi tombol.
+
+Catatan: perubahan ini menambahkan properti opsional ke record IndexedDB sehingga data lama tetap dapat dibaca tanpa menghapus database. Tetap lakukan backup sebelum deployment, lalu uji build, stok ganda, filter area Bazar, dan backup/restore pada perangkat target.
