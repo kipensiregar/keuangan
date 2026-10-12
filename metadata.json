@@ -1,0 +1,6 @@
+{
+  "name": "Warung Medan Finance Offline",
+  "description": "Aplikasi pembukuan offline-first Warung Medan CT Catering dengan database lokal Dexie/IndexedDB, backup terenkripsi, dan dukungan GitHub Pages.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
