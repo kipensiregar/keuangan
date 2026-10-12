@@ -26,11 +26,6 @@ export const StockMovementModal: React.FC<StockMovementModalProps> = ({
   defaultBazarArea
 }) => {
   const { ingredients, bazarEvents, selectedStoreId, showToast } = useApp();
-  const visibleIngredients = ingredients.filter((item) => selectedStoreId === 'ALL' || item.storeId === selectedStoreId);
-  const areaScope = bazarArea || defaultBazarArea;
-  const movementIngredients = areaScope
-    ? visibleIngredients.filter((item) => item.storeId === 'store_bazar' && (!item.bazarArea || item.bazarArea === areaScope))
-    : visibleIngredients;
 
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [ingredientId, setIngredientId] = useState(selectedIngredient?.id || ingredients[0]?.id || '');
