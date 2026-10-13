@@ -88,7 +88,7 @@ export const StockMovementModal: React.FC<StockMovementModalProps> = ({
         quantity,
         secondaryQuantity: currentIng.secondaryUnit ? secondaryQuantity : undefined,
         expectedQuantity: movementType === 'MASUK_PEMBELIAN' ? (expectedQuantity || quantity) : undefined,
-        expectedSecondaryQuantity: movementType === 'MASUK_PEMBELIAN' && currentIng.secondaryUnit ? (expectedSecondaryInput !== '' ? expectedSecondaryQuantity : secondaryQuantity) : undefined,
+        expectedSecondaryQuantity: movementType === 'MASUK_PEMBELIAN' && currentIng.secondaryUnit ? (expectedSecondaryQtyInput !== '' ? expectedSecondaryQuantity : secondaryQuantity) : undefined,
         sourceName: sourceName.trim() || undefined,
         responsibleParty: movementType === 'MASUK_PEMBELIAN' ? responsibleParty : (movementType === 'KELUAR_BAZAR' ? 'BAZAR_STAFF' : responsibleParty),
         receivedBy: receivedBy.trim() || undefined,
