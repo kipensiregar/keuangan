@@ -4,7 +4,7 @@
  */
 
 import { db } from '../db';
-import type { BazarArea, DailySalesSummary, PaymentSplitItem, SalesChannel, PaymentMethod } from '../../types';
+import type { DailySalesSummary, PaymentSplitItem, SalesChannel, PaymentMethod } from '../../types';
 
 export const salesRepository = {
   async getAll(storeId?: string): Promise<DailySalesSummary[]> {
@@ -42,7 +42,6 @@ export const salesRepository = {
   async createDailySummary(payload: {
     storeId: string;
     eventId?: string;
-    bazarArea?: BazarArea;
     date: string;
     channel: SalesChannel;
     grossSales: number;
@@ -91,7 +90,6 @@ export const salesRepository = {
         id,
         storeId: payload.storeId,
         eventId: payload.eventId,
-        bazarArea: payload.bazarArea,
         date: payload.date,
         channel: payload.channel,
         grossSales: payload.grossSales,
