@@ -6,6 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { StoreSelector } from '../../components/common/StoreSelector';
+import { BazarEventSelector } from '../../components/common/BazarEventSelector';
 import { inventoryRepository } from '../../database/repositories/inventoryRepository';
 import { StockMovementModal } from './StockMovementModal';
 import { TransferStockModal } from './TransferStockModal';
@@ -22,13 +23,11 @@ import {
   ArrowUpRight,
   History,
   Layers,
-  Boxes,
-  Edit3,
-  Trash2
+  Boxes
 } from 'lucide-react';
 
 export const InventoryView: React.FC = () => {
-  const { ingredients, stores, selectedStoreId, refreshData, showToast } = useApp();
+  const { ingredients, stores, selectedStoreId, selectedBazarEventId, refreshData, showToast } = useApp();
 
   const [activeSubTab, setActiveSubTab] = useState<'CATALOG' | 'HISTORY'>('CATALOG');
   const [searchQuery, setSearchQuery] = useState('');
@@ -41,8 +40,6 @@ export const InventoryView: React.FC = () => {
   const [isTransferStockOpen, setIsTransferStockOpen] = useState(false);
   const [isAddIngredientOpen, setIsAddIngredientOpen] = useState(false);
   const [selectedIngredientForMove, setSelectedIngredientForMove] = useState<Ingredient | null>(null);
-  const [selectedIngredientForEdit, setSelectedIngredientForEdit] = useState<Ingredient | null>(null);
-  const [bazarAreaFilter, setBazarAreaFilter] = useState<'ALL' | 'A' | 'B'>('ALL');
 
   const isConsolidated = selectedStoreId === 'ALL';
   const currentStore = stores.find((s) => s.id === selectedStoreId);
@@ -50,7 +47,7 @@ export const InventoryView: React.FC = () => {
   const loadMovements = async () => {
     try {
       setIsLoadingMovements(true);
-      const list = await inventoryRepository.getMovements(undefined, selectedStoreId);
+      const list = await inventoryRepository.getMovements(undefined, selectedStoreId, selectedStoreId === 'store_bazar' ? selectedBazarEventId || undefined : undefined);
       setMovements(list);
     } catch (err) {
       console.error(err);
@@ -63,17 +60,16 @@ export const InventoryView: React.FC = () => {
     if (activeSubTab === 'HISTORY') {
       loadMovements();
     }
-  }, [activeSubTab, selectedStoreId]);
+  }, [activeSubTab, selectedStoreId, selectedBazarEventId]);
 
   // Filter ingredients by chosen store
   const relevantIngredients = ingredients.filter((i) => {
-    const storeMatch = isConsolidated ? true : i.storeId === selectedStoreId;
-    const areaApplies = selectedStoreId === 'store_bazar' || selectedStoreId === 'ALL';
-    const areaMatch = !areaApplies || bazarAreaFilter === 'ALL' || i.bazarArea === bazarAreaFilter;
-    return storeMatch && areaMatch;
+    if (!isConsolidated && i.storeId !== selectedStoreId) return false;
+    if (selectedStoreId === 'store_bazar' && selectedBazarEventId) return i.eventId === selectedBazarEventId;
+    return true;
   });
   const totalValuation = relevantIngredients.reduce((sum, i) => sum + i.totalValuation, 0);
-  const lowStockCount = relevantIngredients.filter((i) => i.currentStock <= i.minimumStock).length;
+  const lowStockCount = relevantIngredients.filter((i) => i.currentStock <= i.minimumStock || (!!i.secondaryUnit && (i.currentStockSecondary || 0) <= (i.minimumStockSecondary || 0))).length;
 
   // Extract categories
   const categories = Array.from(new Set(relevantIngredients.map((i) => i.category)));
@@ -95,6 +91,7 @@ export const InventoryView: React.FC = () => {
       <div className="bg-white p-2.5 rounded-3xl border border-slate-200/90 shadow-xs">
         <StoreSelector />
       </div>
+      <BazarEventSelector />
 
       {/* 1. Inventory Summary Banner */}
       <div className="bg-white rounded-3xl p-4 border border-slate-200/90 shadow-xs">
@@ -182,15 +179,6 @@ export const InventoryView: React.FC = () => {
 
       {activeSubTab === 'CATALOG' ? (
         <>
-          {(selectedStoreId === 'store_bazar' || selectedStoreId === 'ALL') && (
-            <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3">
-              <label className="text-xs font-bold text-amber-950 whitespace-nowrap">Kelola stok bazar:</label>
-              <select value={bazarAreaFilter} onChange={(e) => setBazarAreaFilter(e.target.value as 'ALL' | 'A' | 'B')} className="flex-1 h-10 rounded-lg border border-amber-300 bg-white px-3 text-xs font-semibold">
-                <option value="ALL">Semua Area Bazar</option><option value="A">Bazar A</option><option value="B">Bazar B</option>
-              </select>
-            </div>
-          )}
-
           {/* Category Filter Pills & Search */}
           <div className="space-y-2">
             <div className="relative">
@@ -234,7 +222,7 @@ export const InventoryView: React.FC = () => {
           {/* Ingredient Catalog List */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {filteredIngredients.map((ing) => {
-              const isLowStock = ing.currentStock <= ing.minimumStock;
+              const isLowStock = ing.currentStock <= ing.minimumStock || (!!ing.secondaryUnit && (ing.currentStockSecondary || 0) <= (ing.minimumStockSecondary || 0));
 
               return (
                 <div
@@ -251,7 +239,7 @@ export const InventoryView: React.FC = () => {
                         {ing.name}
                       </h4>
                       <div className="text-[11px] text-slate-500 mt-0.5">
-                        {ing.category} {ing.bazarArea ? `· Bazar ${ing.bazarArea}` : ''} {ing.defaultSupplier ? `· ${ing.defaultSupplier}` : ''}
+                        {ing.category} {ing.defaultSupplier ? `· ${ing.defaultSupplier}` : ''}
                       </div>
                     </div>
 
@@ -271,7 +259,7 @@ export const InventoryView: React.FC = () => {
                           isLowStock ? 'text-amber-800 font-extrabold' : 'text-slate-900'
                         }`}
                       >
-                        {ing.currentStock} {ing.unit}{ing.secondaryUnit ? ` · ${ing.currentSecondaryStock ?? 0} ${ing.secondaryUnit}` : ''}
+                        {ing.currentStock} {ing.unit}{ing.secondaryUnit ? ` · ${ing.currentStockSecondary || 0} ${ing.secondaryUnit}` : ''}
                       </span>
                     </div>
 
@@ -292,16 +280,6 @@ export const InventoryView: React.FC = () => {
 
                   {/* Quick Action Button */}
                   <div className="mt-3 pt-2 flex items-center justify-end gap-2">
-                    <button onClick={() => setSelectedIngredientForEdit(ing)} className="text-xs font-bold text-slate-700 hover:bg-slate-100 px-2.5 py-1.5 rounded-lg flex items-center gap-1" title="Edit master dan harga bahan">
-                      <Edit3 className="w-3.5 h-3.5" /><span>Edit</span>
-                    </button>
-                    <button onClick={async () => {
-                      if (!window.confirm(`Arsipkan bahan ${ing.name}? Riwayat tetap disimpan. Bahan hanya bisa diarsipkan jika stok utama dan tambahan sudah nol.`)) return;
-                      try { await inventoryRepository.archiveIngredient(ing.id); showToast(`Bahan ${ing.name} diarsipkan.`, 'success'); await refreshData(); }
-                      catch (err: any) { showToast(err.message || 'Gagal mengarsipkan bahan', 'error'); }
-                    }} className="text-xs font-bold text-rose-700 hover:bg-rose-50 px-2.5 py-1.5 rounded-lg flex items-center gap-1" title="Arsipkan bahan">
-                      <Trash2 className="w-3.5 h-3.5" /><span>Hapus</span>
-                    </button>
                     <button
                       onClick={() => {
                         setSelectedIngredientForMove(ing);
@@ -333,7 +311,7 @@ export const InventoryView: React.FC = () => {
             </div>
           ) : (
             <div className="divide-y divide-slate-100 text-xs">
-              {movements.filter((m) => !(selectedStoreId === 'store_bazar' || selectedStoreId === 'ALL') || bazarAreaFilter === 'ALL' || m.bazarArea === bazarAreaFilter).map((m) => (
+              {movements.map((m) => (
                 <div key={m.id} className="py-3 flex items-start justify-between gap-2">
                   <div>
                     <div className="font-bold text-slate-900 flex items-center gap-1.5">
@@ -343,7 +321,7 @@ export const InventoryView: React.FC = () => {
                       </span>
                     </div>
                     <div className="text-[11px] text-slate-500 mt-0.5">
-                      {formatIndonesianDate(m.date, true)} {m.bazarArea ? `· Bazar ${m.bazarArea}` : ''} {m.notes ? `· "${m.notes}"` : ''}
+                      {formatIndonesianDate(m.date, true)} {m.sourceName ? `· Asal: ${m.sourceName}` : ''} {m.receivedBy ? `· Diperiksa: ${m.receivedBy}` : ''} {m.notes ? `· "${m.notes}"` : ''}
                     </div>
                   </div>
 
@@ -358,8 +336,11 @@ export const InventoryView: React.FC = () => {
                       }`}
                     >
                       {m.type === 'MASUK_PEMBELIAN' ? '+' : '-'}
-                      {m.quantity} {m.unit}{m.secondaryQuantity ? ` · ${m.secondaryQuantity} ${ingredients.find((i) => i.id === m.ingredientId)?.secondaryUnit || 'satuan tambahan'}` : ''}
+                      {m.quantity} {m.unit}{m.secondaryQuantity !== undefined && m.secondaryQuantity > 0 ? ` · ${m.type === 'MASUK_PEMBELIAN' ? '+' : '-'}${m.secondaryQuantity} ${m.secondaryUnit || 'unit'}` : ''}
                     </div>
+                    {m.expectedQuantity !== undefined && <div className={`text-[10px] font-semibold ${(m.expectedQuantity !== m.quantity || (m.expectedSecondaryQuantity !== undefined && m.expectedSecondaryQuantity !== m.secondaryQuantity)) ? 'text-rose-700' : 'text-emerald-700'}`}>Pesanan {m.expectedQuantity} {m.unit}{m.expectedSecondaryQuantity !== undefined ? ` + ${m.expectedSecondaryQuantity} ${m.secondaryUnit || 'unit'}` : ''} · Aktual {m.quantity} {m.unit}{m.secondaryQuantity !== undefined ? ` + ${m.secondaryQuantity} ${m.secondaryUnit || 'unit'}` : ''}</div>}
+                    {m.responsibleParty && <div className="text-[10px] text-slate-500">Penanggung jawab: {({SUPPLIER: 'Supplier', KITCHEN: 'Dapur', BAZAR_STAFF: 'Petugas bazar', OTHER: 'Lainnya'} as Record<string, string>)[m.responsibleParty]}</div>}
+                    {m.discrepancyNotes && <div className="text-[10px] text-rose-700 max-w-48 whitespace-normal">Catatan: {m.discrepancyNotes}</div>}
                     {m.totalAmount ? (
                       <div className="text-[10px] text-slate-400 font-mono">
                         {formatRupiah(m.totalAmount)}
@@ -385,15 +366,6 @@ export const InventoryView: React.FC = () => {
           if (activeSubTab === 'HISTORY') loadMovements();
         }}
         selectedIngredient={selectedIngredientForMove}
-        defaultBazarArea={bazarAreaFilter === 'ALL' ? undefined : bazarAreaFilter}
-      />
-
-      {/* Edit Ingredient Form Modal */}
-      <IngredientFormModal
-        isOpen={!!selectedIngredientForEdit}
-        ingredient={selectedIngredientForEdit}
-        onClose={() => setSelectedIngredientForEdit(null)}
-        onSuccess={() => { setSelectedIngredientForEdit(null); refreshData(); }}
       />
 
       {/* Add Ingredient Form Modal */}
