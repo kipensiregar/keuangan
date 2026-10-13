@@ -116,6 +116,25 @@ export class WarungFinanceDB extends Dexie {
           if (!ob.storeId) ob.storeId = STORE_PALEMBANG_CENTER_ID;
         });
       });
+
+    // Version 3: event-scoped bazaar inventory and dual-unit stock tracking.
+    this.version(3).stores({
+      stores: 'id, name, code, isActive',
+      bazarEvents: 'id, storeId, status, startDate, endDate',
+      budgets: 'id, storeId, month',
+      accounts: 'id, storeId, name, type',
+      dailySales: 'id, storeId, eventId, date, channel, paymentMethod, isVoided',
+      transactions: 'id, storeId, eventId, date, type, category, sourceAccountId, destinationStoreId, isVoided',
+      ingredients: 'id, storeId, eventId, name, category, isActive',
+      stockMovements: 'id, storeId, eventId, ingredientId, date, type, fromStoreId, toStoreId',
+      products: 'id, name, category, isActive',
+      payables: 'id, storeId, supplierName, dueDate, status',
+      receivables: 'id, storeId, eventId, customerName, dueDate, status',
+      openingBalances: 'id, storeId, effectiveDate',
+      auditLogs: 'id, storeId, timestamp, action, entityType',
+      syncOutbox: 'id, storeId, entityType, status, createdAt',
+      settings: 'id'
+    });
   }
 }
 
