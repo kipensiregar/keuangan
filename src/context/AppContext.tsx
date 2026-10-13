@@ -43,6 +43,8 @@ interface AppContextValue {
   setSelectedStoreId: (storeId: string) => void;
   stores: Store[];
   bazarEvents: BazarEvent[];
+  selectedBazarEventId: string;
+  setSelectedBazarEventId: (eventId: string) => void;
   unmappedRecordCount: number;
   // Repositories & Data
   accounts: Account[];
@@ -92,6 +94,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [selectedStoreId, setSelectedStoreId] = useState<string>(CONSOLIDATED_STORE_ID);
   const [stores, setStores] = useState<Store[]>(DEFAULT_OFFICIAL_STORES);
   const [bazarEvents, setBazarEvents] = useState<BazarEvent[]>([]);
+  const [selectedBazarEventId, setSelectedBazarEventId] = useState<string>('');
   const [unmappedRecordCount, setUnmappedRecordCount] = useState<number>(0);
 
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -265,6 +268,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setSelectedStoreId,
         stores,
         bazarEvents,
+        selectedBazarEventId,
+        setSelectedBazarEventId,
         unmappedRecordCount,
         accounts,
         ingredients,
