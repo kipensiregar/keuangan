@@ -7,6 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { PeriodFilter } from '../../components/common/PeriodFilter';
 import { StoreSelector } from '../../components/common/StoreSelector';
+import { BazarEventSelector } from '../../components/common/BazarEventSelector';
 import { accountingService } from '../../services/accountingService';
 import { debtRepository } from '../../database/repositories/debtRepository';
 import { transactionRepository } from '../../database/repositories/transactionRepository';
@@ -56,11 +57,10 @@ import {
 } from 'lucide-react';
 
 export const ReportsView: React.FC = () => {
-  const { dateRange, selectedStoreId, stores, bazarEvents, accounts, refreshData, showToast } = useApp();
+  const { dateRange, selectedStoreId, stores, bazarEvents, selectedBazarEventId, accounts, refreshData, showToast } = useApp();
 
   type ReportTab = 'PNL' | 'CASHFLOW' | 'COMPARISON' | 'BAZAR' | 'DEBTS' | 'AUDIT_TRANSFER' | 'HISTORY';
   const [activeReportTab, setActiveReportTab] = useState<ReportTab>('PNL');
-  const [selectedBazarEventId, setSelectedBazarEventId] = useState<string>('');
 
   const [pnlReport, setPnlReport] = useState<ProfitLossReport | null>(null);
   const [cashFlowReport, setCashFlowReport] = useState<CashFlowReport | null>(null);
@@ -122,8 +122,8 @@ export const ReportsView: React.FC = () => {
         accountingService.getStoreComparison(dateRange.startDate, dateRange.endDate),
         debtRepository.getAllPayables(selectedStoreId),
         debtRepository.getAllReceivables(selectedStoreId),
-        salesRepository.getAll(selectedStoreId),
-        transactionRepository.getAll(selectedStoreId),
+        salesRepository.getAll(selectedStoreId).then((rows) => selectedStoreId === 'store_bazar' && selectedBazarEventId ? rows.filter((row) => row.eventId === selectedBazarEventId) : rows),
+        transactionRepository.getAll(selectedStoreId).then((rows) => selectedStoreId === 'store_bazar' && selectedBazarEventId ? rows.filter((row) => row.eventId === selectedBazarEventId) : rows),
         storeRepository.getInterStoreTransferAudit(dateRange.startDate, dateRange.endDate)
       ]);
 
@@ -440,27 +440,8 @@ export const ReportsView: React.FC = () => {
       {/* 2. Period Filter */}
       <PeriodFilter />
 
-      {/* Optional Bazar Event Filter (Shown when Bazar is chosen) */}
-      {selectedStoreId === 'store_bazar' && bazarEvents.length > 0 && (
-        <div className="p-3 bg-amber-50 rounded-2xl border border-amber-200 flex items-center justify-between text-xs">
-          <div className="flex items-center gap-2">
-            <Tent className="w-4 h-4 text-[#800020] shrink-0" />
-            <span className="font-semibold text-amber-900">Filter Event Bazar:</span>
-          </div>
-          <select
-            value={selectedBazarEventId}
-            onChange={(e) => setSelectedBazarEventId(e.target.value)}
-            className="px-3 py-1.5 bg-white border border-amber-300 rounded-xl text-xs font-bold text-slate-900"
-          >
-            <option value="">-- Semua Event Bazar --</option>
-            {bazarEvents.map((ev) => (
-              <option key={ev.id} value={ev.id}>
-                {ev.name} ({ev.startDate})
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
+      {/* Shared dynamic bazaar event filter */}
+      <BazarEventSelector />
 
       {/* 3. Sub Tabs for Reports */}
       <div className="flex items-center gap-1 p-1 bg-slate-200/70 rounded-xl overflow-x-auto scrollbar-none">
