@@ -7,7 +7,7 @@ import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { transactionRepository } from '../../database/repositories/transactionRepository';
 import { debtRepository } from '../../database/repositories/debtRepository';
-import { type BazarArea, type TransactionType, type ExpenseCategory, DEFAULT_OFFICIAL_STORES } from '../../types';
+import { type TransactionType, type ExpenseCategory, DEFAULT_OFFICIAL_STORES } from '../../types';
 import { formatRupiah } from '../../utils/formatters';
 import { X, CheckCircle, ArrowRightLeft } from 'lucide-react';
 
@@ -18,14 +18,14 @@ interface AddExpenseModalProps {
 }
 
 export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ isOpen, onClose, onSuccess }) => {
-  const { accounts, stores, bazarEvents, selectedStoreId, showToast } = useApp();
+  const { accounts, stores, bazarEvents, selectedStoreId, selectedBazarEventId, showToast } = useApp();
   const availableStores = stores && stores.length > 0 ? stores : DEFAULT_OFFICIAL_STORES;
 
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const initialStore = selectedStoreId !== 'ALL' ? selectedStoreId : 'store_palembang_center';
   const [storeId, setStoreId] = useState(initialStore);
-  const [eventId, setEventId] = useState('');
-  const [bazarArea, setBazarArea] = useState<BazarArea | ''>('');
+  const [eventId, setEventId] = useState(selectedBazarEventId || '');
+  React.useEffect(() => { if (selectedBazarEventId) setEventId(selectedBazarEventId); }, [selectedBazarEventId]);
   const [txType, setTxType] = useState<TransactionType>('PENGELUARAN_OPERASIONAL');
   const [category, setCategory] = useState<ExpenseCategory>('Bahan Baku');
   const [amountInput, setAmountInput] = useState('');
@@ -86,7 +86,6 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ isOpen, onClos
       await transactionRepository.createTransaction({
         storeId,
         eventId: storeId === 'store_bazar' && eventId ? eventId : undefined,
-        bazarArea: storeId === 'store_bazar' && bazarArea ? bazarArea : undefined,
         date,
         type: txType,
         category:
@@ -139,7 +138,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ isOpen, onClos
         <form onSubmit={handleSubmit} className="space-y-4 pt-4">
           {/* Unit Cabang */}
           <div className="p-3 bg-amber-50/70 rounded-2xl border border-amber-200/60 space-y-2">
-            <div className={`grid ${storeId === 'store_bazar' ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-2'} gap-2.5`}>
+            <div className="grid grid-cols-2 gap-2.5">
               <div>
                 <label className="block text-xs font-semibold text-slate-800 mb-1">
                   Unit Cabang Usaha *
@@ -157,14 +156,6 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ isOpen, onClos
                 </select>
               </div>
 
-              {storeId === 'store_bazar' && (
-                <div>
-                  <label className="block text-xs font-semibold text-slate-800 mb-1">Area Bazar</label>
-                  <select value={bazarArea} onChange={(e) => setBazarArea(e.target.value as BazarArea | '')} className="w-full h-10 px-3 rounded-xl border border-slate-300 text-xs bg-white">
-                    <option value="">Umum / belum dipilih</option><option value="A">Bazar A</option><option value="B">Bazar B</option>
-                  </select>
-                </div>
-              )}
               {storeId === 'store_bazar' && (
                 <div>
                   <label className="block text-xs font-semibold text-slate-800 mb-1">
