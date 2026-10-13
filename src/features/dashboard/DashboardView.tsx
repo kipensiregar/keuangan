@@ -13,6 +13,7 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { PeriodFilter } from '../../components/common/PeriodFilter';
 import { StoreSelector } from '../../components/common/StoreSelector';
+import { BazarEventSelector } from '../../components/common/BazarEventSelector';
 import { StatCard } from '../../components/common/StatCard';
 import { accountingService } from '../../services/accountingService';
 import { debtRepository } from '../../database/repositories/debtRepository';
@@ -57,6 +58,7 @@ export const DashboardView: React.FC = () => {
   const {
     dateRange,
     selectedStoreId,
+    selectedBazarEventId,
     stores,
     accounts,
     ingredients,
@@ -97,12 +99,13 @@ export const DashboardView: React.FC = () => {
             dateRange.startDate,
             dateRange.endDate,
             dateRange.label,
-            selectedStoreId
+            selectedStoreId,
+            selectedStoreId === 'store_bazar' && selectedBazarEventId ? selectedBazarEventId : undefined
           ),
           debtRepository.getSummary(selectedStoreId),
-          salesRepository.getByDateRange(dateRange.startDate, dateRange.endDate, selectedStoreId),
-          transactionRepository.getByDateRange(dateRange.startDate, dateRange.endDate, selectedStoreId),
-          inventoryRepository.getLowStockAlerts(selectedStoreId),
+          salesRepository.getByDateRange(dateRange.startDate, dateRange.endDate, selectedStoreId, selectedStoreId === 'store_bazar' ? selectedBazarEventId || undefined : undefined),
+          transactionRepository.getByDateRange(dateRange.startDate, dateRange.endDate, selectedStoreId, selectedStoreId === 'store_bazar' ? selectedBazarEventId || undefined : undefined),
+          inventoryRepository.getLowStockAlerts(selectedStoreId, selectedStoreId === 'store_bazar' ? selectedBazarEventId || undefined : undefined),
           isConsolidated ? accountingService.getStoreComparison(dateRange.startDate, dateRange.endDate) : Promise.resolve([])
         ]);
 
@@ -123,11 +126,15 @@ export const DashboardView: React.FC = () => {
     return () => {
       isMounted = false;
     };
-  }, [dateRange, selectedStoreId, isConsolidated]);
+  }, [dateRange, selectedStoreId, selectedBazarEventId, isConsolidated]);
 
   // Account balances filtered by chosen store
   const relevantAccounts = accounts.filter((a) => (isConsolidated ? true : a.storeId === selectedStoreId));
-  const relevantIngredients = ingredients.filter((i) => (isConsolidated ? true : i.storeId === selectedStoreId));
+  const relevantIngredients = ingredients.filter((i) => {
+    if (!isConsolidated && i.storeId !== selectedStoreId) return false;
+    if (selectedStoreId === 'store_bazar' && selectedBazarEventId) return i.eventId === selectedBazarEventId;
+    return true;
+  });
 
   const cashBalance = relevantAccounts
     .filter((a) => a.type === 'Kas')
@@ -193,7 +200,12 @@ export const DashboardView: React.FC = () => {
               Aplikasi menggunakan data contoh simulasi usaha.
             </span>
           </div>
-
+          <button
+            onClick={() => setActiveTab('settings')}
+            className="text-[11px] font-bold text-[#800020] hover:underline whitespace-nowrap ml-2"
+          >
+            Mulai Pembukuan Nyata →
+          </button>
         </div>
       )}
 
@@ -212,7 +224,7 @@ export const DashboardView: React.FC = () => {
                 Peringatan: {lowStockItems.length} Bahan Baku di Bawah Stok Minimum ({isConsolidated ? 'Semua Cabang' : currentStore?.name})
               </div>
               <div className="text-[11px] text-amber-700/90 mt-0.5 line-clamp-1">
-                {lowStockItems.map((i) => `${i.name} (sisa ${i.currentStock} ${i.unit})`).join(' · ')}
+                {lowStockItems.map((i) => `${i.name} (sisa ${i.currentStock} ${i.unit}${i.secondaryUnit ? ` + ${i.currentStockSecondary || 0} ${i.secondaryUnit}` : ''})`).join(' · ')}
               </div>
             </div>
           </div>
