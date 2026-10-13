@@ -108,8 +108,8 @@ export const StockMovementModal: React.FC<StockMovementModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
-      <div className="w-full max-w-lg bg-white rounded-3xl p-5 shadow-2xl border border-slate-200 my-8">
+    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm overflow-y-auto overscroll-contain">
+      <div className="w-full max-w-2xl max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-2rem)] overflow-y-auto bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-2xl border border-slate-200 my-auto min-w-0">
         {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b border-slate-100">
           <div>
@@ -138,7 +138,7 @@ export const StockMovementModal: React.FC<StockMovementModalProps> = ({
             <select
               value={ingredientId}
               onChange={(e) => setIngredientId(e.target.value)}
-              className="w-full h-11 px-3 rounded-xl border border-slate-300 text-sm font-semibold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-[#800020]"
+              className="box-border w-full min-w-0 h-11 px-3 rounded-xl border border-slate-300 text-sm font-semibold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-[#800020]"
             >
               {scopedIngredients.map((ing) => (
                 <option key={ing.id} value={ing.id}>
@@ -150,7 +150,7 @@ export const StockMovementModal: React.FC<StockMovementModalProps> = ({
 
           {/* Current Ingredient Summary Card */}
           {currentIng && (
-            <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200/80 flex items-center justify-between text-xs">
+            <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200/80 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs min-w-0">
               <div>
                 <span className="text-slate-500">Stok Saat Ini:</span>
                 <div className="font-bold font-mono tabular-nums text-slate-800 text-sm mt-0.5">
@@ -177,72 +177,72 @@ export const StockMovementModal: React.FC<StockMovementModalProps> = ({
             <label className="block text-xs font-semibold text-slate-700 mb-1.5">
               Jenis Pergerakan Stok
             </label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() => setMovementType('PEMAKAIAN_MANUAL')}
-                className={`p-2.5 rounded-xl border text-xs font-semibold flex items-center gap-2 transition-all ${
+                className={`min-w-0 p-2.5 rounded-xl border text-xs font-semibold flex items-start sm:items-center gap-2 transition-all ${
                   movementType === 'PEMAKAIAN_MANUAL'
                     ? 'border-[#800020] bg-[#800020]/10 text-[#800020] font-bold'
                     : 'border-slate-200 text-slate-600 hover:bg-slate-50'
                 }`}
               >
                 <Flame className="w-4 h-4 text-amber-600" />
-                <span>Pemakaian Dapur (Masak)</span>
+                <span className="min-w-0 break-words text-left">Pemakaian Dapur (Masak)</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setMovementType('MASUK_PEMBELIAN')}
-                className={`p-2.5 rounded-xl border text-xs font-semibold flex items-center gap-2 transition-all ${
+                className={`min-w-0 p-2.5 rounded-xl border text-xs font-semibold flex items-start sm:items-center gap-2 transition-all ${
                   movementType === 'MASUK_PEMBELIAN'
                     ? 'border-[#800020] bg-[#800020]/10 text-[#800020] font-bold'
                     : 'border-slate-200 text-slate-600 hover:bg-slate-50'
                 }`}
               >
                 <PackagePlus className="w-4 h-4 text-emerald-600" />
-                <span>Barang Masuk (Beli)</span>
+                <span className="min-w-0 break-words text-left">Barang Masuk (Beli)</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setMovementType('KELUAR_BAZAR')}
-                className={`p-2.5 rounded-xl border text-xs font-semibold flex items-center gap-2 transition-all ${movementType === 'KELUAR_BAZAR' ? 'border-[#800020] bg-[#800020]/10 text-[#800020] font-bold' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                className={`min-w-0 p-2.5 rounded-xl border text-xs font-semibold flex items-start sm:items-center gap-2 transition-all ${movementType === 'KELUAR_BAZAR' ? 'border-[#800020] bg-[#800020]/10 text-[#800020] font-bold' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
               >
                 <PackagePlus className="w-4 h-4 text-rose-600" />
-                <span>Keluar / Terjual di Bazar</span>
+                <span className="min-w-0 break-words text-left">Keluar / Terjual di Bazar</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setMovementType('RUSAK_TERBUANG')}
-                className={`p-2.5 rounded-xl border text-xs font-semibold flex items-center gap-2 transition-all ${
+                className={`min-w-0 p-2.5 rounded-xl border text-xs font-semibold flex items-start sm:items-center gap-2 transition-all ${
                   movementType === 'RUSAK_TERBUANG'
                     ? 'border-[#800020] bg-[#800020]/10 text-[#800020] font-bold'
                     : 'border-slate-200 text-slate-600 hover:bg-slate-50'
                 }`}
               >
                 <AlertTriangle className="w-4 h-4 text-rose-600" />
-                <span>Bahan Rusak / Basi</span>
+                <span className="min-w-0 break-words text-left">Bahan Rusak / Basi</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setMovementType('PENYESUAIAN_OPNAME')}
-                className={`p-2.5 rounded-xl border text-xs font-semibold flex items-center gap-2 transition-all ${
+                className={`min-w-0 p-2.5 rounded-xl border text-xs font-semibold flex items-start sm:items-center gap-2 transition-all ${
                   movementType === 'PENYESUAIAN_OPNAME'
                     ? 'border-[#800020] bg-[#800020]/10 text-[#800020] font-bold'
                     : 'border-slate-200 text-slate-600 hover:bg-slate-50'
                 }`}
               >
                 <Scale className="w-4 h-4 text-indigo-600" />
-                <span>Koreksi Opname Fisik</span>
+                <span className="min-w-0 break-words text-left">Koreksi Opname Fisik</span>
               </button>
             </div>
           </div>
 
           {/* Tanggal & Jumlah */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 min-w-0">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
                 Tanggal
@@ -252,33 +252,33 @@ export const StockMovementModal: React.FC<StockMovementModalProps> = ({
                 required
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className="w-full h-11 px-3 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#800020]"
+                className="box-border w-full min-w-0 h-11 px-3 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#800020]"
               />
             </div>
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">{movementType === 'PENYESUAIAN_OPNAME' ? `Stok Fisik Baru (${currentIng?.unit || 'unit'})` : `Jumlah (${currentIng?.unit || 'unit'})`}</label>
-              <input type="number" step="any" min="0" required value={qtyInput} onChange={(e) => setQtyInput(e.target.value)} placeholder="0" className="w-full h-11 px-3 rounded-xl border border-slate-300 text-base font-bold font-mono tabular-nums text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#800020]" />
+              <input type="number" step="any" min="0" required value={qtyInput} onChange={(e) => setQtyInput(e.target.value)} placeholder="0" className="box-border w-full min-w-0 h-11 px-3 rounded-xl border border-slate-300 text-base font-bold font-mono tabular-nums text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#800020]" />
             </div>
             {currentIng?.secondaryUnit && <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Jumlah ({currentIng.secondaryUnit}){movementType === 'PENYESUAIAN_OPNAME' ? ' fisik baru' : ''}</label>
-              <input type="number" step="any" min="0" value={secondaryQtyInput} onChange={(e) => setSecondaryQtyInput(e.target.value)} placeholder="0" className="w-full h-11 px-3 rounded-xl border border-slate-300 text-base font-bold font-mono tabular-nums text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#800020]" />
+              <input type="number" step="any" min="0" value={secondaryQtyInput} onChange={(e) => setSecondaryQtyInput(e.target.value)} placeholder="0" className="box-border w-full min-w-0 h-11 px-3 rounded-xl border border-slate-300 text-base font-bold font-mono tabular-nums text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#800020]" />
             </div>}
           </div>
 
           {movementType === 'MASUK_PEMBELIAN' && (
             <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-3 space-y-3">
               <div className="text-xs font-bold text-amber-900">Pemeriksaan barang masuk · bandingkan pesanan dengan barang diterima</div>
-              <div className="grid grid-cols-2 gap-3">
-                <div><label className="block text-xs font-semibold text-slate-700 mb-1">Jumlah seharusnya ({currentIng?.unit})</label><input type="number" min="0" step="any" value={expectedQtyInput} onChange={(e) => setExpectedQtyInput(e.target.value)} placeholder={qtyInput || '0'} className="w-full h-10 px-3 rounded-xl border border-slate-300 text-sm" /></div>
-                {currentIng?.secondaryUnit && <div><label className="block text-xs font-semibold text-slate-700 mb-1">Seharusnya ({currentIng.secondaryUnit})</label><input type="number" min="0" step="any" value={expectedSecondaryQtyInput} onChange={(e) => setExpectedSecondaryQtyInput(e.target.value)} placeholder="0" className="w-full h-10 px-3 rounded-xl border border-slate-300 text-sm" /></div>}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 min-w-0">
+                <div><label className="block text-xs font-semibold text-slate-700 mb-1">Jumlah seharusnya ({currentIng?.unit})</label><input type="number" min="0" step="any" value={expectedQtyInput} onChange={(e) => setExpectedQtyInput(e.target.value)} placeholder={qtyInput || '0'} className="box-border w-full min-w-0 h-10 px-3 rounded-xl border border-slate-300 text-sm" /></div>
+                {currentIng?.secondaryUnit && <div><label className="block text-xs font-semibold text-slate-700 mb-1">Seharusnya ({currentIng.secondaryUnit})</label><input type="number" min="0" step="any" value={expectedSecondaryQtyInput} onChange={(e) => setExpectedSecondaryQtyInput(e.target.value)} placeholder="0" className="box-border w-full min-w-0 h-10 px-3 rounded-xl border border-slate-300 text-sm" /></div>}
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div><label className="block text-xs font-semibold text-slate-700 mb-1">Supplier / asal barang</label><input value={sourceName} onChange={(e) => setSourceName(e.target.value)} placeholder="Nama supplier atau dapur" className="w-full h-10 px-3 rounded-xl border border-slate-300 text-xs" /></div>
-                <div><label className="block text-xs font-semibold text-slate-700 mb-1">Pihak terkait selisih</label><select value={responsibleParty} onChange={(e) => setResponsibleParty(e.target.value as typeof responsibleParty)} className="w-full h-10 px-2 rounded-xl border border-slate-300 text-xs bg-white"><option value="SUPPLIER">Supplier</option><option value="KITCHEN">Dapur</option><option value="BAZAR_STAFF">Petugas bazar</option><option value="OTHER">Lainnya</option></select></div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 min-w-0">
+                <div><label className="block text-xs font-semibold text-slate-700 mb-1">Supplier / asal barang</label><input value={sourceName} onChange={(e) => setSourceName(e.target.value)} placeholder="Nama supplier atau dapur" className="box-border w-full min-w-0 h-10 px-3 rounded-xl border border-slate-300 text-xs" /></div>
+                <div><label className="block text-xs font-semibold text-slate-700 mb-1">Pihak terkait selisih</label><select value={responsibleParty} onChange={(e) => setResponsibleParty(e.target.value as typeof responsibleParty)} className="box-border w-full min-w-0 h-10 px-2 rounded-xl border border-slate-300 text-xs bg-white"><option value="SUPPLIER">Supplier</option><option value="KITCHEN">Dapur</option><option value="BAZAR_STAFF">Petugas bazar</option><option value="OTHER">Lainnya</option></select></div>
               </div>
-              <div><label className="block text-xs font-semibold text-slate-700 mb-1">Diterima / diperiksa oleh</label><input value={receivedBy} onChange={(e) => setReceivedBy(e.target.value)} placeholder="Nama petugas penerima" className="w-full h-10 px-3 rounded-xl border border-slate-300 text-xs" /></div>
-              <div><label className="block text-xs font-semibold text-slate-700 mb-1">Catatan selisih / bukti</label><input value={discrepancyNotes} onChange={(e) => setDiscrepancyNotes(e.target.value)} placeholder="Contoh: pesanan 5 kg, diterima 4,7 kg" className="w-full h-10 px-3 rounded-xl border border-slate-300 text-xs" /></div>
+              <div><label className="block text-xs font-semibold text-slate-700 mb-1">Diterima / diperiksa oleh</label><input value={receivedBy} onChange={(e) => setReceivedBy(e.target.value)} placeholder="Nama petugas penerima" className="box-border w-full min-w-0 h-10 px-3 rounded-xl border border-slate-300 text-xs" /></div>
+              <div><label className="block text-xs font-semibold text-slate-700 mb-1">Catatan selisih / bukti</label><input value={discrepancyNotes} onChange={(e) => setDiscrepancyNotes(e.target.value)} placeholder="Contoh: pesanan 5 kg, diterima 4,7 kg" className="box-border w-full min-w-0 h-10 px-3 rounded-xl border border-slate-300 text-xs" /></div>
               <p className="text-[10px] text-amber-900">Jumlah aktual yang ditambahkan ke stok adalah angka pada kolom Jumlah di atas. Angka seharusnya disimpan untuk audit selisih.</p>
             </div>
           )}
@@ -286,8 +286,8 @@ export const StockMovementModal: React.FC<StockMovementModalProps> = ({
           {movementType === 'KELUAR_BAZAR' && (
             <div className="rounded-2xl border border-rose-200 bg-rose-50 p-3 space-y-2">
               <div className="text-xs font-bold text-rose-900">Catat barang yang dikirim keluar atau terjual di stand</div>
-              <div><label className="block text-xs font-semibold text-slate-700 mb-1">Petugas stand yang bertanggung jawab</label><input value={receivedBy} onChange={(e) => setReceivedBy(e.target.value)} placeholder="Nama petugas stand" className="w-full h-10 px-3 rounded-xl border border-slate-300 text-xs" /></div>
-              <div><label className="block text-xs font-semibold text-slate-700 mb-1">Keterangan / nomor bukti penjualan</label><input value={discrepancyNotes} onChange={(e) => setDiscrepancyNotes(e.target.value)} placeholder="Contoh: rekap penjualan sesi siang" className="w-full h-10 px-3 rounded-xl border border-slate-300 text-xs" /></div>
+              <div><label className="block text-xs font-semibold text-slate-700 mb-1">Petugas stand yang bertanggung jawab</label><input value={receivedBy} onChange={(e) => setReceivedBy(e.target.value)} placeholder="Nama petugas stand" className="box-border w-full min-w-0 h-10 px-3 rounded-xl border border-slate-300 text-xs" /></div>
+              <div><label className="block text-xs font-semibold text-slate-700 mb-1">Keterangan / nomor bukti penjualan</label><input value={discrepancyNotes} onChange={(e) => setDiscrepancyNotes(e.target.value)} placeholder="Contoh: rekap penjualan sesi siang" className="box-border w-full min-w-0 h-10 px-3 rounded-xl border border-slate-300 text-xs" /></div>
             </div>
           )}
 
@@ -303,7 +303,7 @@ export const StockMovementModal: React.FC<StockMovementModalProps> = ({
                 placeholder={formatRupiah(currentIng?.averagePurchasePrice || 0)}
                 value={purchasePriceInput ? formatRupiah(purchasePrice) : ''}
                 onChange={(e) => setPurchasePriceInput(e.target.value)}
-                className="w-full h-11 px-3 rounded-xl border border-slate-300 text-sm font-mono tabular-nums focus:outline-none focus:ring-2 focus:ring-[#800020]"
+                className="box-border w-full min-w-0 h-11 px-3 rounded-xl border border-slate-300 text-sm font-mono tabular-nums focus:outline-none focus:ring-2 focus:ring-[#800020]"
               />
               <p className="text-[11px] text-slate-500 mt-1">
                 Sistem akan memperbarui harga pokok rata-rata tertimbang (Weighted Average Cost) secara otomatis.
@@ -321,7 +321,7 @@ export const StockMovementModal: React.FC<StockMovementModalProps> = ({
               placeholder="Contoh: Pemakaian untuk 80 porsi pesanan catering pernikahan"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="w-full h-10 px-3 rounded-xl border border-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-[#800020]"
+              className="box-border w-full min-w-0 h-10 px-3 rounded-xl border border-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-[#800020]"
             />
           </div>
 
