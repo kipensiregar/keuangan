@@ -7,6 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { PeriodFilter } from '../../components/common/PeriodFilter';
 import { StoreSelector } from '../../components/common/StoreSelector';
+import { BazarEventSelector } from '../../components/common/BazarEventSelector';
 import { TransferMoneyModal } from './TransferMoneyModal';
 import { salesRepository } from '../../database/repositories/salesRepository';
 import { transactionRepository } from '../../database/repositories/transactionRepository';
@@ -27,11 +28,10 @@ import {
 } from 'lucide-react';
 
 export const TransactionsView: React.FC = () => {
-  const { dateRange, selectedStoreId, stores, refreshData, showToast } = useApp();
+  const { dateRange, selectedStoreId, selectedBazarEventId, stores, refreshData, showToast } = useApp();
 
   const [activeSubTab, setActiveSubTab] = useState<'ALL' | 'SALES' | 'EXPENSES' | 'TRANSFERS'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
-  const [bazarAreaFilter, setBazarAreaFilter] = useState<'ALL' | 'A' | 'B'>('ALL');
   const [salesList, setSalesList] = useState<DailySalesSummary[]>([]);
   const [txList, setTxList] = useState<FinancialTransaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -53,8 +53,8 @@ export const TransactionsView: React.FC = () => {
     try {
       setIsLoading(true);
       const [sales, txs] = await Promise.all([
-        salesRepository.getByDateRange(dateRange.startDate, dateRange.endDate, selectedStoreId),
-        transactionRepository.getByDateRange(dateRange.startDate, dateRange.endDate, selectedStoreId)
+        salesRepository.getByDateRange(dateRange.startDate, dateRange.endDate, selectedStoreId, selectedStoreId === 'store_bazar' ? selectedBazarEventId || undefined : undefined),
+        transactionRepository.getByDateRange(dateRange.startDate, dateRange.endDate, selectedStoreId, selectedStoreId === 'store_bazar' ? selectedBazarEventId || undefined : undefined)
       ]);
       setSalesList(sales);
       setTxList(txs);
@@ -67,7 +67,7 @@ export const TransactionsView: React.FC = () => {
 
   useEffect(() => {
     loadTransactions();
-  }, [dateRange, selectedStoreId]);
+  }, [dateRange, selectedStoreId, selectedBazarEventId]);
 
   const handleConfirmVoid = async () => {
     if (!voidTarget) return;
@@ -144,9 +144,7 @@ export const TransactionsView: React.FC = () => {
   };
 
   // Filtered lists
-  const shouldFilterBazarArea = selectedStoreId === 'store_bazar' || selectedStoreId === 'ALL';
   const filteredSales = salesList.filter((s) => {
-    if (shouldFilterBazarArea && bazarAreaFilter !== 'ALL' && s.bazarArea !== bazarAreaFilter) return false;
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
     return (
@@ -157,7 +155,6 @@ export const TransactionsView: React.FC = () => {
   });
 
   const filteredTxs = txList.filter((t) => {
-    if (shouldFilterBazarArea && bazarAreaFilter !== 'ALL' && t.bazarArea !== bazarAreaFilter) return false;
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
     return (
@@ -173,6 +170,7 @@ export const TransactionsView: React.FC = () => {
       <div className="bg-white p-2.5 rounded-3xl border border-slate-200/90 shadow-xs">
         <StoreSelector />
       </div>
+      <BazarEventSelector />
 
       {/* Top Header & Export */}
       <div className="flex items-center justify-between">
@@ -202,15 +200,6 @@ export const TransactionsView: React.FC = () => {
           </button>
         </div>
       </div>
-
-      {(selectedStoreId === 'store_bazar' || selectedStoreId === 'ALL') && (
-        <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3">
-          <label className="text-xs font-bold text-amber-950 whitespace-nowrap">Filter area transaksi:</label>
-          <select value={bazarAreaFilter} onChange={(e) => setBazarAreaFilter(e.target.value as 'ALL' | 'A' | 'B')} className="flex-1 h-10 rounded-lg border border-amber-300 bg-white px-3 text-xs font-semibold">
-            <option value="ALL">Semua Area Bazar</option><option value="A">Bazar A</option><option value="B">Bazar B</option>
-          </select>
-        </div>
-      )}
 
       {/* Sub Tabs */}
       <div className="flex items-center gap-1 p-1 bg-slate-200/70 rounded-xl overflow-x-auto">
@@ -315,7 +304,6 @@ export const TransactionsView: React.FC = () => {
                       <span>{formatIndonesianDate(s.date, true)}</span>
                       <span>·</span>
                       <span>{s.paymentMethod}</span>
-                      {s.bazarArea && <span>· Bazar {s.bazarArea}</span>}
                       {s.referenceNumber && <span>· No: {s.referenceNumber}</span>}
                     </div>
                     {s.notes && (
@@ -388,7 +376,6 @@ export const TransactionsView: React.FC = () => {
                           <span>{formatIndonesianDate(t.date, true)}</span>
                           <span>·</span>
                           <span>{t.category}</span>
-                          {t.bazarArea && <span>· Bazar {t.bazarArea}</span>}
                           <span>·</span>
                           <span>{t.paymentMethod}</span>
                         </div>
