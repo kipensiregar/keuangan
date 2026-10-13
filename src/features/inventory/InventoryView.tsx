@@ -23,7 +23,9 @@ import {
   ArrowUpRight,
   History,
   Layers,
-  Boxes
+  Boxes,
+  Pencil,
+  Trash2
 } from 'lucide-react';
 
 export const InventoryView: React.FC = () => {
@@ -39,6 +41,8 @@ export const InventoryView: React.FC = () => {
   const [isMovementModalOpen, setIsMovementModalOpen] = useState(false);
   const [isTransferStockOpen, setIsTransferStockOpen] = useState(false);
   const [isAddIngredientOpen, setIsAddIngredientOpen] = useState(false);
+  const [isEditIngredientOpen, setIsEditIngredientOpen] = useState(false);
+  const [selectedIngredientForEdit, setSelectedIngredientForEdit] = useState<Ingredient | null>(null);
   const [selectedIngredientForMove, setSelectedIngredientForMove] = useState<Ingredient | null>(null);
 
   const isConsolidated = selectedStoreId === 'ALL';
@@ -95,7 +99,7 @@ export const InventoryView: React.FC = () => {
 
       {/* 1. Inventory Summary Banner */}
       <div className="bg-white rounded-3xl p-4 border border-slate-200/90 shadow-xs">
-        <div className="grid grid-cols-3 gap-2 text-center divide-x divide-slate-100">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-2 text-center sm:divide-x divide-slate-100">
           <div>
             <span className="text-[11px] font-semibold text-slate-500">
               {isConsolidated ? 'Valuasi Gabungan' : `Valuasi ${currentStore?.name}`}
@@ -150,7 +154,7 @@ export const InventoryView: React.FC = () => {
       </div>
 
       {/* 3. Action Buttons */}
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
         <button
           onClick={() => {
             setSelectedIngredientForMove(null);
@@ -251,7 +255,7 @@ export const InventoryView: React.FC = () => {
                     )}
                   </div>
 
-                  <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-slate-100 text-xs">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-3 pt-3 border-t border-slate-100 text-xs min-w-0">
                     <div>
                       <span className="text-[10px] text-slate-400 block">Sisa Stok</span>
                       <span
@@ -265,30 +269,61 @@ export const InventoryView: React.FC = () => {
 
                     <div>
                       <span className="text-[10px] text-slate-400 block">Harga WAC</span>
-                      <span className="font-mono font-bold text-xs tabular-nums text-slate-700">
+                      <span className="break-words font-mono font-bold text-xs tabular-nums text-slate-700">
                         {formatRupiah(ing.averagePurchasePrice)}
                       </span>
                     </div>
 
                     <div>
                       <span className="text-[10px] text-slate-400 block">Valuasi</span>
-                      <span className="font-mono font-bold text-xs tabular-nums text-emerald-700">
+                      <span className="break-words font-mono font-bold text-xs tabular-nums text-emerald-700">
                         {formatRupiah(ing.totalValuation)}
                       </span>
                     </div>
                   </div>
 
-                  {/* Quick Action Button */}
-                  <div className="mt-3 pt-2 flex items-center justify-end gap-2">
+                  {/* Quick Actions */}
+                  <div className="mt-3 pt-3 border-t border-slate-100 flex flex-wrap items-center gap-2">
                     <button
                       onClick={() => {
                         setSelectedIngredientForMove(ing);
                         setIsMovementModalOpen(true);
                       }}
-                      className="text-xs font-bold text-[#800020] hover:bg-[#800020]/10 px-2.5 py-1.5 rounded-lg transition-colors flex items-center gap-1"
+                      className="flex-1 min-w-[140px] text-xs font-bold text-[#800020] hover:bg-[#800020]/10 px-2.5 py-2 rounded-lg transition-colors flex items-center justify-center gap-1.5"
                     >
-                      <Flame className="w-3.5 h-3.5 text-amber-600" />
+                      <Flame className="w-3.5 h-3.5 text-amber-600 shrink-0" />
                       <span>Catat Pergerakan</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSelectedIngredientForEdit(ing);
+                        setIsEditIngredientOpen(true);
+                      }}
+                      className="text-xs font-semibold text-slate-700 border border-slate-200 hover:bg-slate-50 px-3 py-2 rounded-lg transition-colors flex items-center gap-1.5"
+                      aria-label={`Edit ${ing.name}`}
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                      <span>Edit</span>
+                    </button>
+                    <button
+                      onClick={async () => {
+                        const confirmed = window.confirm(
+                          `Nonaktifkan bahan "${ing.name}"? Bahan tidak akan muncul di katalog aktif, tetapi riwayat pergerakan stok tetap disimpan.`
+                        );
+                        if (!confirmed) return;
+                        try {
+                          await inventoryRepository.deactivateIngredient(ing.id);
+                          await refreshData();
+                          showToast(`Bahan "${ing.name}" berhasil dinonaktifkan. Riwayat tetap tersimpan.`, 'success');
+                        } catch (err: any) {
+                          showToast(`Gagal menghapus bahan: ${err.message}`, 'error');
+                        }
+                      }}
+                      className="text-xs font-semibold text-rose-700 border border-rose-200 hover:bg-rose-50 px-3 py-2 rounded-lg transition-colors flex items-center gap-1.5"
+                      aria-label={`Hapus ${ing.name}`}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Hapus</span>
                     </button>
                   </div>
                 </div>
@@ -374,6 +409,20 @@ export const InventoryView: React.FC = () => {
         onClose={() => setIsAddIngredientOpen(false)}
         onSuccess={() => {
           refreshData();
+        }}
+      />
+
+      {/* Edit Ingredient Form Modal */}
+      <IngredientFormModal
+        isOpen={isEditIngredientOpen}
+        ingredient={selectedIngredientForEdit}
+        onClose={() => {
+          setIsEditIngredientOpen(false);
+          setSelectedIngredientForEdit(null);
+        }}
+        onSuccess={() => {
+          refreshData();
+          if (activeSubTab === 'HISTORY') loadMovements();
         }}
       />
 
