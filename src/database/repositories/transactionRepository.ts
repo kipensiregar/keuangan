@@ -4,7 +4,7 @@
  */
 
 import { db } from '../db';
-import type { BazarArea, FinancialTransaction, TransactionType, ExpenseCategory } from '../../types';
+import type { FinancialTransaction, TransactionType, ExpenseCategory } from '../../types';
 
 export const transactionRepository = {
   async getAll(storeId?: string): Promise<FinancialTransaction[]> {
@@ -34,7 +34,6 @@ export const transactionRepository = {
   async createTransaction(payload: {
     storeId?: string;
     eventId?: string;
-    bazarArea?: BazarArea;
     date: string;
     type: TransactionType;
     category: ExpenseCategory | 'Transfer Antar-Akun' | 'Transfer Antar-Cabang' | 'Ekuitas Pemilik' | 'Utang/Piutang';
@@ -133,7 +132,6 @@ export const transactionRepository = {
           id,
           storeId: payload.storeId || sourceAcc.storeId,
           eventId: payload.eventId,
-          bazarArea: payload.bazarArea,
           date: payload.date,
           type: payload.type,
           category: payload.category,
