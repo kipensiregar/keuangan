@@ -122,6 +122,62 @@ export const inventoryRepository = {
   },
 
   /**
+   * Perbarui data master tanpa mengubah saldo stok dan harga rata-rata,
+   * agar riwayat transaksi serta valuasi persediaan tetap konsisten.
+   */
+  async updateIngredient(id: string, data: {
+    name: string;
+    category: string;
+    minimumStock: number;
+    minimumStockSecondary?: number;
+    defaultSupplier?: string;
+  }): Promise<void> {
+    const now = new Date().toISOString();
+    await db.transaction('rw', [db.ingredients, db.auditLogs], async () => {
+      const existing = await db.ingredients.get(id);
+      if (!existing || !existing.isActive) throw new Error('Bahan baku tidak ditemukan atau sudah dinonaktifkan');
+      await db.ingredients.update(id, {
+        name: data.name.trim(),
+        category: data.category,
+        minimumStock: data.minimumStock,
+        minimumStockSecondary: data.minimumStockSecondary || 0,
+        defaultSupplier: data.defaultSupplier?.trim() || undefined,
+        updatedAt: now
+      } as Partial<Ingredient>);
+      await db.auditLogs.add({
+        id: `audit_${Date.now()}`,
+        action: 'UPDATE_INGREDIENT',
+        storeId: existing.storeId,
+        entityType: 'INGREDIENT',
+        entityId: id,
+        details: `Perbarui master bahan: ${existing.name} → ${data.name.trim()}`,
+        timestamp: now
+      });
+    });
+  },
+
+  /**
+   * Hapus secara aman (soft delete). Riwayat stok tetap disimpan.
+   */
+  async deactivateIngredient(id: string): Promise<void> {
+    const now = new Date().toISOString();
+    await db.transaction('rw', [db.ingredients, db.auditLogs], async () => {
+      const existing = await db.ingredients.get(id);
+      if (!existing || !existing.isActive) throw new Error('Bahan baku tidak ditemukan atau sudah dihapus');
+      await db.ingredients.update(id, { isActive: false, updatedAt: now });
+      await db.auditLogs.add({
+        id: `audit_${Date.now()}`,
+        action: 'DEACTIVATE_INGREDIENT',
+        storeId: existing.storeId,
+        entityType: 'INGREDIENT',
+        entityId: id,
+        details: `Nonaktifkan bahan baku: ${existing.name}. Riwayat stok dipertahankan.`,
+        timestamp: now
+      });
+    });
+  },
+
+  /**
    * Catat Pergerakan Stok:
    * - MASUK_PEMBELIAN -> Tambah stok & hitung Weighted Average Cost (WAC)
    * - PEMAKAIAN_MANUAL -> Kurangi stok (pemakaian resep/dapur harian)
