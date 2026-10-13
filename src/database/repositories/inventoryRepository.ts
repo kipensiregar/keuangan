@@ -4,35 +4,41 @@
  */
 
 import { db } from '../db';
-import type { BazarArea, Ingredient, StockMovement, StockMovementType, UnitType } from '../../types';
+import type { Ingredient, StockMovement, StockMovementType, UnitType } from '../../types';
 
 export const inventoryRepository = {
-  async getAllIngredients(storeId?: string): Promise<Ingredient[]> {
-    if (storeId && storeId !== 'ALL') {
-      return await db.ingredients.filter((i) => i.isActive && i.storeId === storeId).toArray();
-    }
-    return await db.ingredients.filter((i) => i.isActive).toArray();
+  async getAllIngredients(storeId?: string, eventId?: string): Promise<Ingredient[]> {
+    return await db.ingredients.filter((i) => {
+      if (!i.isActive) return false;
+      if (storeId && storeId !== 'ALL' && i.storeId !== storeId) return false;
+      if (eventId && i.eventId !== eventId) return false;
+      // Unassigned legacy bazaar stock is shown only in the all-events view, never mixed into one event.
+      if (storeId === 'store_bazar' && eventId && i.eventId !== eventId) return false;
+      return true;
+    }).toArray();
   },
 
   async getIngredientById(id: string): Promise<Ingredient | undefined> {
     return await db.ingredients.get(id);
   },
 
-  async getMovements(ingredientId?: string, storeId?: string): Promise<StockMovement[]> {
+  async getMovements(ingredientId?: string, storeId?: string, eventId?: string): Promise<StockMovement[]> {
     if (ingredientId) {
       return await db.stockMovements
         .filter((m) => {
           if (m.ingredientId !== ingredientId) return false;
           if (storeId && storeId !== 'ALL' && m.storeId !== storeId) return false;
+          if (eventId && m.eventId !== eventId) return false;
           return true;
         })
         .reverse()
         .sortBy('date');
     }
     if (storeId && storeId !== 'ALL') {
-      return await db.stockMovements.filter((m) => m.storeId === storeId).reverse().sortBy('date');
+      return await db.stockMovements.filter((m) => m.storeId === storeId && (!eventId || m.eventId === eventId)).reverse().sortBy('date');
     }
-    return await db.stockMovements.orderBy('date').reverse().toArray();
+    const all = await db.stockMovements.orderBy('date').reverse().toArray();
+    return eventId ? all.filter((m) => m.eventId === eventId) : all;
   },
 
   /**
@@ -47,9 +53,10 @@ export const inventoryRepository = {
     minimumStock: number;
     purchasePrice: number;
     defaultSupplier?: string;
-    bazarArea?: BazarArea;
-    secondaryUnit?: UnitType;
-    initialSecondaryStock?: number;
+    eventId?: string;
+    secondaryUnit?: Ingredient['secondaryUnit'];
+    initialStockSecondary?: number;
+    minimumStockSecondary?: number;
   }): Promise<Ingredient> {
     const now = new Date().toISOString();
     const id = `ing_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
@@ -59,16 +66,17 @@ export const inventoryRepository = {
     const ingredient: Ingredient = {
       id,
       storeId,
-      bazarArea: data.bazarArea,
       name: data.name,
       category: data.category,
       unit: data.unit,
       initialStock: data.initialStock,
       currentStock: data.initialStock,
-      secondaryUnit: data.secondaryUnit,
-      initialSecondaryStock: data.initialSecondaryStock || 0,
-      currentSecondaryStock: data.initialSecondaryStock || 0,
       minimumStock: data.minimumStock,
+      eventId: data.eventId,
+      secondaryUnit: data.secondaryUnit,
+      initialStockSecondary: data.initialStockSecondary || 0,
+      currentStockSecondary: data.initialStockSecondary || 0,
+      minimumStockSecondary: data.minimumStockSecondary || 0,
       averagePurchasePrice: data.purchasePrice,
       totalValuation,
       defaultSupplier: data.defaultSupplier,
@@ -79,18 +87,18 @@ export const inventoryRepository = {
 
     await db.transaction('rw', [db.ingredients, db.stockMovements, db.auditLogs], async () => {
       await db.ingredients.add(ingredient);
-      if (data.initialStock > 0 || (data.initialSecondaryStock || 0) > 0) {
+      if (data.initialStock > 0 || (data.initialStockSecondary || 0) > 0) {
         const initMov: StockMovement = {
           id: `mov_init_${Date.now()}`,
           storeId,
-          bazarArea: data.bazarArea,
+          eventId: data.eventId,
           ingredientId: id,
           ingredientName: data.name,
           date: now.slice(0, 10),
           type: 'MASUK_PEMBELIAN',
           quantity: data.initialStock,
-          secondaryQuantity: data.initialSecondaryStock || 0,
           unit: data.unit,
+          secondaryQuantity: data.initialStockSecondary || 0,
           unitPrice: data.purchasePrice,
           totalAmount: totalValuation,
           notes: 'Stok awal master bahan',
@@ -105,62 +113,12 @@ export const inventoryRepository = {
         action: 'ADD_INGREDIENT',
         entityType: 'INGREDIENT',
         entityId: id,
-        details: `Tambah bahan baku: ${data.name} (${data.initialStock} ${data.unit})`,
+        details: `Tambah bahan baku: ${data.name} (${data.initialStock} ${data.unit}${data.secondaryUnit ? ` + ${data.initialStockSecondary || 0} ${data.secondaryUnit}` : ''})`,
         timestamp: now
       });
     });
 
     return ingredient;
-  },
-
-  /** Update master bahan without rewriting historical movements. */
-  async updateIngredient(id: string, data: {
-    name: string; category: string; unit: UnitType; minimumStock: number;
-    purchasePrice: number; defaultSupplier?: string; bazarArea?: BazarArea;
-    secondaryUnit?: UnitType; initialSecondaryStock?: number;
-  }): Promise<void> {
-    const now = new Date().toISOString();
-    await db.transaction('rw', [db.ingredients, db.auditLogs], async () => {
-      const existing = await db.ingredients.get(id);
-      if (!existing) throw new Error('Bahan baku tidak ditemukan');
-      const price = Math.max(0, data.purchasePrice);
-      await db.ingredients.update(id, {
-        name: data.name.trim(), category: data.category, unit: data.unit,
-        minimumStock: Math.max(0, data.minimumStock),
-        averagePurchasePrice: price,
-        totalValuation: Math.round(existing.currentStock * price),
-        defaultSupplier: data.defaultSupplier?.trim() || undefined,
-        bazarArea: data.bazarArea,
-        secondaryUnit: data.secondaryUnit,
-        initialSecondaryStock: data.initialSecondaryStock || 0,
-        currentSecondaryStock: existing.currentSecondaryStock ?? data.initialSecondaryStock ?? 0,
-        updatedAt: now
-      });
-      await db.auditLogs.add({
-        id: `audit_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-        action: 'UPDATE_INGREDIENT', entityType: 'INGREDIENT', entityId: id,
-        details: `Ubah master bahan ${existing.name} menjadi ${data.name}; harga satuan ${price}`,
-        timestamp: now
-      });
-    });
-  },
-
-  /** Soft-delete/arsip so historical movements remain intact. */
-  async archiveIngredient(id: string): Promise<void> {
-    const now = new Date().toISOString();
-    await db.transaction('rw', [db.ingredients, db.auditLogs], async () => {
-      const ingredient = await db.ingredients.get(id);
-      if (!ingredient) throw new Error('Bahan baku tidak ditemukan');
-      if (ingredient.currentStock > 0 || (ingredient.currentSecondaryStock ?? 0) > 0) {
-        throw new Error('Stok masih tersedia. Catat pemakaian atau opname hingga nol sebelum mengarsipkan bahan.');
-      }
-      await db.ingredients.update(id, { isActive: false, updatedAt: now });
-      await db.auditLogs.add({
-        id: `audit_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-        action: 'ARCHIVE_INGREDIENT', entityType: 'INGREDIENT', entityId: id,
-        details: `Arsipkan master bahan ${ingredient.name}; riwayat tetap dipertahankan`, timestamp: now
-      });
-    });
   },
 
   /**
@@ -173,21 +131,26 @@ export const inventoryRepository = {
   async recordMovement(payload: {
     storeId?: string;
     eventId?: string;
-    bazarArea?: BazarArea;
     ingredientId: string;
     date: string;
     type: StockMovementType;
     quantity: number;
-    secondaryQuantity?: number;
     unitPrice?: number;
     notes?: string;
     relatedTransactionId?: string;
     fromStoreId?: string;
     toStoreId?: string;
     isInterStoreTransfer?: boolean;
+    secondaryQuantity?: number;
+    expectedQuantity?: number;
+    expectedSecondaryQuantity?: number;
+    sourceName?: string;
+    responsibleParty?: StockMovement['responsibleParty'];
+    receivedBy?: string;
+    discrepancyNotes?: string;
   }): Promise<StockMovement> {
-    if (payload.quantity <= 0 && (payload.secondaryQuantity ?? 0) <= 0) {
-      throw new Error('Jumlah stok utama atau satuan tambahan harus lebih besar dari 0');
+    if (payload.quantity < 0 || (payload.quantity === 0 && payload.type !== 'PENYESUAIAN_OPNAME')) {
+      throw new Error('Jumlah stok harus lebih besar dari 0, kecuali koreksi opname dapat bernilai 0.');
     }
 
     const now = new Date().toISOString();
@@ -201,8 +164,7 @@ export const inventoryRepository = {
       let newStock = ing.currentStock;
       let newAvgPrice = ing.averagePurchasePrice;
       let movementTotalAmount = 0;
-      let newSecondaryStock = ing.currentSecondaryStock ?? ing.initialSecondaryStock ?? 0;
-      const secondaryQty = Math.max(0, payload.secondaryQuantity ?? 0);
+      let newStockSecondary = ing.currentStockSecondary || 0;
 
       if (payload.type === 'MASUK_PEMBELIAN') {
         const purchasePrice = payload.unitPrice ?? ing.averagePurchasePrice;
@@ -213,17 +175,19 @@ export const inventoryRepository = {
         const oldTotalCost = ing.currentStock * ing.averagePurchasePrice;
         const newTotalCost = oldTotalCost + movementTotalAmount;
         newStock = ing.currentStock + payload.quantity;
-        newSecondaryStock += secondaryQty;
+        newStockSecondary += payload.secondaryQuantity || 0;
         newAvgPrice = newStock > 0 ? Math.round(newTotalCost / newStock) : purchasePrice;
-      } else if (payload.type === 'PEMAKAIAN_MANUAL' || payload.type === 'RUSAK_TERBUANG') {
+      } else if (payload.type === 'PEMAKAIAN_MANUAL' || payload.type === 'RUSAK_TERBUANG' || payload.type === 'KELUAR_BAZAR') {
+        if (payload.quantity > ing.currentStock) throw new Error(`Stok ${ing.name} tidak cukup. Tersedia ${ing.currentStock} ${ing.unit}.`);
+        if (ing.secondaryUnit && (payload.secondaryQuantity || 0) > (ing.currentStockSecondary || 0)) throw new Error(`Stok ${ing.name} tidak cukup. Tersedia ${ing.currentStockSecondary || 0} ${ing.secondaryUnit}.`);
         newStock = Math.max(0, ing.currentStock - payload.quantity);
-        newSecondaryStock = Math.max(0, newSecondaryStock - secondaryQty);
+        newStockSecondary = Math.max(0, newStockSecondary - (payload.secondaryQuantity || 0));
         movementTotalAmount = Math.round(payload.quantity * ing.averagePurchasePrice);
       } else if (payload.type === 'PENYESUAIAN_OPNAME') {
         // Pada koreksi opname, quantity yang diinput adalah stok fisik baru
         const delta = payload.quantity - ing.currentStock;
         newStock = payload.quantity;
-        if (payload.secondaryQuantity !== undefined) newSecondaryStock = secondaryQty;
+        if (ing.secondaryUnit) newStockSecondary = payload.secondaryQuantity ?? newStockSecondary;
         movementTotalAmount = Math.round(Math.abs(delta) * ing.averagePurchasePrice);
       }
 
@@ -231,7 +195,7 @@ export const inventoryRepository = {
 
       await db.ingredients.update(payload.ingredientId, {
         currentStock: newStock,
-        currentSecondaryStock: newSecondaryStock,
+        currentStockSecondary: newStockSecondary,
         averagePurchasePrice: newAvgPrice,
         totalValuation: newTotalValuation,
         updatedAt: now
@@ -240,15 +204,21 @@ export const inventoryRepository = {
       const movement: StockMovement = {
         id: movId,
         storeId,
-        eventId: payload.eventId,
-        bazarArea: payload.bazarArea ?? ing.bazarArea,
+        eventId: payload.eventId || ing.eventId,
         ingredientId: ing.id,
         ingredientName: ing.name,
         date: payload.date,
         type: payload.type,
         quantity: payload.quantity,
-        secondaryQuantity: payload.secondaryQuantity,
         unit: ing.unit,
+        secondaryQuantity: payload.secondaryQuantity,
+        secondaryUnit: ing.secondaryUnit,
+        expectedQuantity: payload.expectedQuantity,
+        expectedSecondaryQuantity: payload.expectedSecondaryQuantity,
+        sourceName: payload.sourceName,
+        responsibleParty: payload.responsibleParty,
+        receivedBy: payload.receivedBy,
+        discrepancyNotes: payload.discrepancyNotes,
         unitPrice: payload.unitPrice ?? ing.averagePurchasePrice,
         totalAmount: movementTotalAmount,
         notes: payload.notes,
@@ -268,7 +238,7 @@ export const inventoryRepository = {
         storeId,
         entityType: 'INGREDIENT',
         entityId: ing.id,
-        details: `${payload.type}: ${ing.name} qty ${payload.quantity} ${ing.unit} (Sisa: ${newStock} ${ing.unit})`,
+        details: `${payload.type}: ${ing.name} qty ${payload.quantity} ${ing.unit}${ing.secondaryUnit ? ` + ${payload.secondaryQuantity || 0} ${ing.secondaryUnit}` : ''} (Sisa: ${newStock} ${ing.unit}${ing.secondaryUnit ? ` + ${newStockSecondary} ${ing.secondaryUnit}` : ''})${payload.discrepancyNotes ? `; SELISIH: ${payload.discrepancyNotes}` : ''}`, 
         timestamp: now
       });
 
@@ -289,10 +259,10 @@ export const inventoryRepository = {
   /**
    * Ambil daftar bahan yang stoknya berada di bawah stok minimum
    */
-  async getLowStockAlerts(storeId?: string): Promise<Ingredient[]> {
+  async getLowStockAlerts(storeId?: string, eventId?: string): Promise<Ingredient[]> {
     const ingredients = await db.ingredients
-      .filter((i) => i.isActive && (!storeId || storeId === 'ALL' || i.storeId === storeId))
+      .filter((i) => i.isActive && (!storeId || storeId === 'ALL' || i.storeId === storeId) && (!eventId || i.eventId === eventId))
       .toArray();
-    return ingredients.filter((i) => i.currentStock <= i.minimumStock);
+    return ingredients.filter((i) => i.currentStock <= i.minimumStock || (!!i.secondaryUnit && (i.currentStockSecondary || 0) <= (i.minimumStockSecondary || 0)));
   }
 };
